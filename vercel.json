@@ -1,0 +1,6 @@
+{
+  "buildCommand": "flutter build web --release",
+  "outputDirectory": "build/web",
+  "devCommand": "flutter run -d web-server --web-port 3000",
+  "installCommand": "git clone https://github.com/flutter/flutter.git -b stable && export PATH=\"$PATH:`pwd`/flutter/bin\" && flutter doctor && flutter pub get"
+}
