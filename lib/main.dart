@@ -1,24 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'core/theme/app_theme.dart';
-import 'screens/home/home_screen.dart';
-import 'providers/project_provider.dart';
-import 'providers/photo_provider.dart';
+import 'screens/home_screen.dart';
+import 'screens/photo_selection_screen.dart';
+import 'screens/collage_edit_screen.dart';
+import 'screens/preview_screen.dart';
+import 'screens/export_screen.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0A1F1A),
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
-  
   runApp(const KomjirakFrameApp());
 }
 
@@ -27,17 +14,28 @@ class KomjirakFrameApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ProjectProvider()),
-        ChangeNotifierProvider(create: (_) => PhotoProvider()),
-      ],
-      child: MaterialApp(
-        title: 'Komjirak Frame',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const HomeScreen(),
+    return MaterialApp(
+      title: 'Komjirak Frame',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
+      // Set the initial route
+      initialRoute: '/',
+      // Define all application routes
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/photo-selection': (context) => const PhotoSelectionScreen(),
+        '/collage-edit': (context) => const CollageEditScreen(),
+        '/preview': (context) => const PreviewScreen(),
+        '/export': (context) => const ExportScreen(),
+      },
+      // Handle unknown routes
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const HomeScreen(),
+        );
+      },
     );
   }
 }
