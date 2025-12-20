@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../models/collage_layout.dart';
 import '../../models/frame_template.dart';
 import '../../widgets/frame_selector.dart';
-import '../../widgets/collage_canvas.dart';
+import '../../widgets/web_image.dart';
 
 class CollageEditScreen extends StatefulWidget {
   const CollageEditScreen({Key? key}) : super(key: key);
@@ -12,16 +13,25 @@ class CollageEditScreen extends StatefulWidget {
 }
 
 class _CollageEditScreenState extends State<CollageEditScreen> {
-  late List<String> _photos;
+  List<XFile> _photos = [];
   CollageLayout? _selectedLayout;
   final List<CollageLayout> _layouts = FrameTemplates.getAllTemplates();
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    _photos = args?['photos'] ?? [];
-    _selectedLayout ??= _layouts.first;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is List<XFile>) {
+      _photos = args;
+    } else if (args is List) {
+      // Handle generic list
+      try {
+        _photos = args.cast<XFile>();
+      } catch (e) {
+        debugPrint('Error casting photos: $e');
+      }
+    }
+    _selectedLayout ??= _layouts.isNotEmpty ? _layouts.first : null;
   }
 
   @override
@@ -66,15 +76,47 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: _selectedLayout != null
-                  ? CollageCanvas(
-                      layout: _selectedLayout!,
-                      imagePaths: _photos,
-                      onImageTransformed: (index, position, scale) {
-                        // Handle image transformation
-                      },
+              child: _selectedLayout != null && _photos.isNotEmpty
+                  ? Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(8),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          itemCount: _photos.length,
+                          itemBuilder: (context, index) {
+                            return WebCompatibleImage(
+                              imageFile: _photos[index],
+                              fit: BoxFit.cover,
+                            );
+                          },
+                        ),
+                      ),
                     )
-                  : const SizedBox.shrink(),
+                  : Center(
+                      child: Text(
+                        'No photos selected',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
             ),
           ),
           Padding(

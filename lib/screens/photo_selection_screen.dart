@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../widgets/web_image.dart';
 
 class PhotoSelectionScreen extends StatefulWidget {
   const PhotoSelectionScreen({super.key});
@@ -24,8 +25,8 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
       final List<XFile> images = await _picker.pickMultiImage();
       
       if (images.isNotEmpty) {
+        final int remainingSlots = _maxPhotos - _selectedPhotos.length;
         setState(() {
-          int remainingSlots = _maxPhotos - _selectedPhotos.length;
           _selectedPhotos.addAll(images.take(remainingSlots));
         });
 
@@ -98,7 +99,9 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
     Navigator.pushNamed(
       context,
       '/collage-edit',
-      arguments: _selectedPhotos,
+      arguments: {
+        'photos': _selectedPhotos,
+      },
     );
   }
 
@@ -234,8 +237,8 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
                             // Photo
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.file(
-                                File(_selectedPhotos[index].path),
+                              child: WebCompatibleImage(
+                                imageFile: _selectedPhotos[index],
                                 fit: BoxFit.cover,
                               ),
                             ),

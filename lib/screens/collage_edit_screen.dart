@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../widgets/web_image.dart';
 
 class CollageEditScreen extends StatefulWidget {
   final List<XFile> photos;
@@ -184,6 +185,8 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
         return _buildPolaroidLayout();
       case FrameLayout.bubbles:
         return _buildBubblesLayout();
+      default:
+        return _buildClassicLayout();
     }
   }
 
@@ -452,8 +455,8 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
         ],
       ),
       child: ClipOval(
-        child: Image.file(
-          File(photo.path),
+        child: WebCompatibleImage(
+          imageFile: photo,
           fit: BoxFit.cover,
         ),
       ),
@@ -461,12 +464,11 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 
   Widget _buildPhotoTile(XFile photo) {
-    return Container(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: FileImage(File(photo.path)),
-          fit: BoxFit.cover,
-        ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: WebCompatibleImage(
+        imageFile: photo,
+        fit: BoxFit.cover,
       ),
     );
   }

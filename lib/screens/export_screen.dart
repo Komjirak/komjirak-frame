@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
+import 'package:share_plus/share_plus.dart';
+import '../services/storage_service.dart';
+import '../services/share_service.dart';
+import '../services/image_service.dart';
+import '../widgets/web_image.dart';
 
 enum ExportQuality {
   high,
@@ -90,8 +95,8 @@ class _ExportScreenState extends State<ExportScreen> {
           aspectRatio: 1,
           child: widget.collagePreview ??
               (widget.collageImagePath != null
-                  ? Image.file(
-                      File(widget.collageImagePath!),
+                  ? Image.network(
+                      widget.collageImagePath!,
                       fit: BoxFit.cover,
                     )
                   : Container(
@@ -428,35 +433,62 @@ class _ExportScreenState extends State<ExportScreen> {
     });
 
     try {
-      // Simulate save operation
-      await Future.delayed(const Duration(seconds: 2));
+      if (widget.collageImagePath == null && widget.collagePreview == null) {
+        throw Exception('No collage image to save');
+      }
 
-      // TODO: Implement actual save to gallery logic
-      // This would typically involve:
-      // 1. Rendering the collage at the selected quality
-      // 2. Adding watermark if enabled
-      // 3. Saving to device gallery using packages like:
-      //    - image_gallery_saver
-      //    - gallery_saver
-      //    - or using platform channels
+      File? imageFile;
+      if (widget.collageImagePath != null) {
+        imageFile = File(widget.collageImagePath!);
+      } else {
+        // If we have a widget preview, we need to capture it
+        // This would typically be done in the preview/edit screen
+        throw Exception('Please generate the collage first');
+      }
+
+      // Request permissions
+      final hasPermission = await StorageService.requestPermissions();
+      if (!hasPermission) {
+        throw Exception('Storage permission denied');
+      }
+
+      // Apply quality settings if needed
+      File? processedImage = imageFile;
+      int quality = _selectedQuality == ExportQuality.high
+          ? 100
+          : _selectedQuality == ExportQuality.medium
+              ? 85
+              : 70;
+
+      if (quality < 100) {
+        processedImage = await ImageService.compressImage(imageFile, quality: quality);
+        processedImage ??= imageFile;
+      }
+
+      // Save to gallery
+      final success = await StorageService.saveToGallery(processedImage);
 
       if (!mounted) return;
 
-      setState(() {
-        _isSaving = false;
-        _isSaved = true;
-      });
+      if (success) {
+        setState(() {
+          _isSaving = false;
+          _isSaved = true;
+        });
 
-      _showSuccessSnackBar('Collage saved to gallery successfully!');
+        _showSuccessSnackBar('Collage saved to gallery successfully!');
 
-      // Reset the saved state after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          setState(() {
-            _isSaved = false;
-          });
-        }
-      });
+        // Reset the saved state after 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _isSaved = false;
+            });
+          }
+        });
+      } else {
+        throw Exception('Failed to save to gallery');
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -468,25 +500,48 @@ class _ExportScreenState extends State<ExportScreen> {
     }
   }
 
-  void _shareToSocial(String platform) {
-    // TODO: Implement sharing logic for each platform
-    // This would typically involve:
-    // 1. Exporting the collage at appropriate quality
-    // 2. Using share_plus package or platform-specific sharing
-    // 3. For Instagram/TikTok: Deep linking to the app
-    // 4. For Messages: Using native share sheet
+  Future<void> _shareToSocial(String platform) async {
+    try {
+      if (widget.collageImagePath == null && widget.collagePreview == null) {
+        throw Exception('No collage image to share');
+      }
 
-    _showInfoSnackBar('Sharing to $platform...');
+      File? imageFile;
+      if (widget.collageImagePath != null) {
+        imageFile = File(widget.collageImagePath!);
+      } else {
+        throw Exception('Please generate the collage first');
+      }
 
-    // Simulate share operation
-    Future.delayed(const Duration(milliseconds: 500), () {
+      _showInfoSnackBar('Preparing to share to $platform...');
+
+      ShareResult? result;
+      switch (platform) {
+        case 'Instagram':
+          result = await ShareService.shareToInstagramStory(imageFile);
+          break;
+        case 'TikTok':
+          result = await ShareService.shareToTikTok(imageFile);
+          break;
+        case 'Snapchat':
+          result = await ShareService.shareToSnapchat(imageFile);
+          break;
+        case 'Messages':
+          result = await ShareService.shareToMessages(imageFile);
+          break;
+        default:
+          result = await ShareService.shareImage(imageFile);
+      }
+
+      if (result != null && mounted) {
+        if (result.status == ShareResultStatus.success) {
+          _showSuccessSnackBar('Shared successfully!');
+        }
+      }
+    } catch (e) {
       if (!mounted) return;
-      
-      // Example implementation placeholder
-      debugPrint('Sharing to $platform with quality: $_selectedQuality');
-      debugPrint('Allow remixing: $_allowRemixing');
-      debugPrint('Add watermark: $_addWatermark');
-    });
+      _showErrorSnackBar('Failed to share: $e');
+    }
   }
 
   void _showSuccessSnackBar(String message) {

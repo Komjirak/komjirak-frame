@@ -1,103 +1,169 @@
 # Komjirak Frame
 
-A beautiful Flutter application for creating stunning photo collages with multiple layout options. Transform your memories into artistic frames with ease!
+> ✨ **GenZ를 위한 감각적인 사진 콜라주 앱** - *by @Komjirak Studio*
+
+인스타그램 스토리, 틱톡, 스냅챗에 올릴 멋진 콜라주를 1-10장의 사진으로 쉽고 빠르게 만들어보세요!
 
 🌐 **[Live Demo](https://komjirak.github.io/komjirak-frame/)**
 
-## ✨ Features
+---
 
-Komjirak Frame offers 6 unique layout styles to showcase your photos:
+## ✨ 주요 기능
 
-1. **Classic** - Traditional grid layout for a clean, organized look
-2. **Split** - Dynamic split-screen arrangements for creative compositions
-3. **Mosaic** - Artistic mosaic patterns for a unique visual appeal
-4. **Film** - Vintage film strip style reminiscent of classic photography
-5. **Polaroid** - Instant camera-inspired frames with authentic polaroid aesthetics
-6. **Bubbles** - Playful circular arrangements for a fun, modern touch
+### 📸 완벽한 사진 콜라주 플로우
+1. **메인 화면** - 저장된 콜라주 프로젝트 관리
+2. **사진 선택** - 갤러리 또는 카메라에서 1-10장 선택
+3. **프레임 & 폰트** - 6가지 레이아웃 + 텍스트 오버레이
+4. **미리보기** - 실시간 프리뷰 확인
+5. **다운로드 & 공유** - 갤러리 저장 및 SNS 직접 공유
 
-### Key Capabilities
+### 🎨 6가지 감각적인 레이아웃
 
-- 📸 Multiple photo selection and arrangement
-- 🎨 Six distinct layout templates
-- 💾 Save and share your creations
-- 📱 Cross-platform support (Android, iOS, Web)
-- 🎯 Intuitive and user-friendly interface
-- 🔄 Real-time preview of layouts
+1. **Classic** - 깔끔한 그리드 레이아웃
+2. **Split** - 역동적인 분할 화면
+3. **Mosaic** - 예술적인 모자이크 패턴
+4. **Film** - 빈티지 필름 스트립 스타일
+5. **Polaroid** - 폴라로이드 카메라 감성
+6. **Bubbles** - 재미있는 원형 배치
 
-## 📋 Prerequisites
+### 💎 핵심 기능
 
-- Flutter SDK (latest stable version recommended)
-- Dart SDK
-- Android Studio / Xcode (for mobile development)
-- A code editor (VS Code, Android Studio, or IntelliJ IDEA)
+- 📱 **1-10장 사진 선택** - 갤러리 & 카메라 지원
+- 🎨 **6가지 프레임 템플릿** - 다양한 스타일
+- ✍️ **텍스트 오버레이** - 폰트 선택 및 문구 삽입
+- 💾 **갤러리 저장** - 고화질 이미지 저장
+- 🔗 **SNS 직접 공유** - Instagram, TikTok, Snapchat 등
+- 🎯 **프로젝트 관리** - 작업 내역 저장 및 불러오기
+- 🌈 **GenZ 감성 디자인** - 라이트/다크 테마 지원
+- ⚡ **빠른 퍼포먼스** - Provider 기반 상태 관리
 
-## 🚀 Installation
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Komjirak/komjirak-frame.git
-   cd komjirak-frame
-   ```
+## 📋 필수 요구사항
 
-2. **Install dependencies**
-   ```bash
-   flutter pub get
-   ```
+- **Flutter SDK** (3.0.0 이상)
+- **Dart SDK**
+- **Android Studio / Xcode** (모바일 개발용)
+- **VS Code** 또는 다른 코드 에디터
 
-3. **Run the application**
-   ```bash
-   flutter run
-   ```
+---
 
-## 📦 Dependencies
+## 🚀 설치 및 실행
 
-This project uses the following Flutter packages:
+### 1. 저장소 클론
+```bash
+git clone https://github.com/Komjirak/komjirak-frame.git
+cd komjirak-frame
+```
 
-- **provider** - State management solution for Flutter applications
-- **image_picker** - Select images from gallery or camera
-- **path_provider** - Access commonly used locations on the filesystem
-- **share_plus** - Share content with other apps
-- **permission_handler** - Manage app permissions across platforms
+### 2. 의존성 설치
+```bash
+flutter pub get
+```
 
-For the complete list of dependencies with versions, see [pubspec.yaml](pubspec.yaml).
+### 3. 앱 실행
+```bash
+# 연결된 기기/에뮬레이터에서 실행
+flutter run
 
-## 🏗️ Project Structure
+# 특정 기기 선택
+flutter devices
+flutter run -d <device_id>
+
+# 릴리즈 모드로 빌드
+flutter build apk  # Android
+flutter build ios  # iOS
+```
+
+---
+
+## 📦 사용된 패키지
+
+### 핵심 패키지
+- **provider** (^6.1.1) - 상태 관리
+- **image_picker** (^1.0.7) - 사진 선택
+- **image** (^4.1.7) - 이미지 처리
+- **flutter_image_compress** (^2.1.0) - 이미지 압축
+
+### 저장 & 권한
+- **path_provider** (^2.1.2) - 파일 시스템 접근
+- **permission_handler** (^11.2.0) - 권한 관리
+- **image_gallery_saver** (^2.0.3) - 갤러리 저장
+
+### 공유 & UI
+- **share_plus** (^7.2.2) - SNS 공유
+- **flutter_staggered_grid_view** (^0.7.0) - 그리드 레이아웃
+- **photo_view** (^0.14.0) - 사진 확대/축소
+
+### 유틸리티
+- **uuid** (^4.3.3) - 고유 ID 생성
+- **intl** (^0.19.0) - 국제화 지원
+
+전체 의존성은 [pubspec.yaml](pubspec.yaml)을 참조하세요.
+
+---
+
+## 🏗️ 프로젝트 구조
 
 ```
 komjirak-frame/
 ├── lib/
-│   ├── main.dart                 # Application entry point
-│   ├── models/                   # Data models
-│   ├── providers/                # State management (Provider)
-│   ├── screens/                  # UI screens
-│   ├── widgets/                  # Reusable widgets
-│   ├── layouts/                  # Frame layout implementations
-│   │   ├── classic_layout.dart
-│   │   ├── split_layout.dart
-│   │   ├── mosaic_layout.dart
-│   │   ├── film_layout.dart
-│   │   ├── polaroid_layout.dart
-│   │   └── bubbles_layout.dart
-│   └── utils/                    # Utility functions and helpers
-├── assets/                       # Images, fonts, and other assets
-├── test/                         # Unit and widget tests
-├── android/                      # Android-specific files
-├── ios/                          # iOS-specific files
-├── web/                          # Web-specific files
-└── pubspec.yaml                  # Project dependencies
+│   ├── main.dart                      # 앱 진입점 + Provider 설정
+│   ├── core/
+│   │   └── theme/
+│   │       └── app_theme.dart         # 라이트/다크 테마
+│   ├── models/
+│   │   ├── collage_layout.dart        # 레이아웃 데이터 모델
+│   │   ├── frame_template.dart        # 프레임 템플릿
+│   │   └── project_model.dart         # 프로젝트 모델
+│   ├── providers/
+│   │   ├── photo_provider.dart        # 사진 상태 관리
+│   │   └── project_provider.dart      # 프로젝트 상태 관리
+│   ├── screens/
+│   │   ├── home/
+│   │   │   └── home_screen.dart       # 메인 화면
+│   │   ├── photo_selection/
+│   │   │   └── photo_selection_screen.dart  # 사진 선택
+│   │   ├── collage_edit/
+│   │   │   └── collage_edit_screen.dart     # 콜라주 편집
+│   │   ├── preview/
+│   │   │   └── preview_screen.dart    # 미리보기
+│   │   └── export/
+│   │       └── export_screen.dart     # 내보내기 & 공유
+│   ├── services/
+│   │   ├── image_service.dart         # 이미지 처리
+│   │   ├── storage_service.dart       # 로컬 저장소 관리
+│   │   └── share_service.dart         # SNS 공유
+│   ├── widgets/
+│   │   ├── collage_canvas.dart        # 콜라주 캔버스
+│   │   ├── frame_selector.dart        # 프레임 선택기
+│   │   ├── photo_grid_item.dart       # 사진 그리드 아이템
+│   │   └── project_card.dart          # 프로젝트 카드
+│   └── utils/
+│       └── constants.dart             # 상수 정의
+├── docs/
+│   └── FEATURES.md                    # 기능 명세서
+├── pubspec.yaml                       # 프로젝트 설정
+└── README.md                          # 이 파일
 ```
 
-## 💻 Development Guide
+---
 
-### Running in Development Mode
+## 💻 개발 가이드
 
-```bash
-# Run on a connected device/emulator
-flutter run
+### 주요 화면 플로우
 
-# Run on a specific device
-flutter devices
-flutter run -d <device_id>
+```
+HomeScreen (프로젝트 관리)
+    ↓
+PhotoSelectionScreen (사진 선택: 1-10장)
+    ↓
+CollageEditScreen (프레임 선택 & 텍스트 삽입)
+    ↓
+PreviewScreen (미리보기)
+    ↓
+ExportScreen (저장 & 공유)
+```
 
 # Run with hot reload enabled (default)
 flutter run --hot

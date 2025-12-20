@@ -3,40 +3,69 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/foundation.dart';
 
 class ShareService {
-  static Future<void> shareImage(File imageFile, {String? text}) async {
+  static Future<ShareResult?> shareImage(File imageFile, {String? text}) async {
     try {
-      await Share.shareXFiles(
+      final result = await Share.shareXFiles(
         [XFile(imageFile.path)],
-        text: text ?? 'Check out my collage from Komjirak Frame!',
+        text: text ?? '✨ Created with Komjirak Frame by @Komjirak Studio',
       );
+      return result;
     } catch (e) {
       debugPrint('Error sharing image: $e');
+      return null;
     }
   }
 
-  static Future<void> shareToInstagramStory(File imageFile) async {
+  static Future<ShareResult?> shareToInstagramStory(File imageFile) async {
     try {
-      // Instagram story sharing would require specific implementation
-      // This is a placeholder for the functionality
-      await Share.shareXFiles([XFile(imageFile.path)]);
+      // Instagram story sharing with proper attribution
+      final result = await Share.shareXFiles(
+        [XFile(imageFile.path)],
+        text: '✨ Made with Komjirak Frame\n@Komjirak Studio',
+      );
+      return result;
     } catch (e) {
       debugPrint('Error sharing to Instagram: $e');
+      return null;
     }
   }
 
-  static Future<void> shareToSnapchat(File imageFile) async {
+  static Future<ShareResult?> shareToSnapchat(File imageFile) async {
     try {
-      await Share.shareXFiles([XFile(imageFile.path)]);
+      final result = await Share.shareXFiles(
+        [XFile(imageFile.path)],
+        text: 'Created with Komjirak Frame 📸',
+      );
+      return result;
     } catch (e) {
       debugPrint('Error sharing to Snapchat: $e');
+      return null;
     }
   }
 
-  static Future<void> shareToMessages(File imageFile) async {
+  static Future<ShareResult?> shareToMessages(File imageFile) async {
     try {
-      await Share.shareXFiles([XFile(imageFile.path)]);
+      final result = await Share.shareXFiles(
+        [XFile(imageFile.path)],
+        text: 'Check out my collage! 🎨',
+      );
+      return result;
     } catch (e) {
       debugPrint('Error sharing to Messages: $e');
+      return null;
+    }
+  }
+
+  static Future<ShareResult?> shareToTikTok(File imageFile) async {
+    try {
+      final result = await Share.shareXFiles(
+        [XFile(imageFile.path)],
+        text: '✨ Komjirak Frame Collage',
+      );
+      return result;
+    } catch (e) {
+      debugPrint('Error sharing to TikTok: $e');
+      return null;
     }
   }
 }
