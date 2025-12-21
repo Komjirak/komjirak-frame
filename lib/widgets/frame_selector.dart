@@ -7,11 +7,11 @@ class FrameSelector extends StatelessWidget {
   final Function(CollageLayout) onLayoutSelected;
 
   const FrameSelector({
-    Key? key,
+    super.key,
     required this.layouts,
     this.selectedLayout,
     required this.onLayoutSelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

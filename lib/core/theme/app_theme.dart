@@ -30,12 +30,10 @@ class AppTheme {
         secondary: secondaryPink,
         tertiary: accentYellow,
         surface: lightSurface,
-        background: lightBackground,
         error: Color(0xFFEE5A6F),
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: darkText,
-        onBackground: darkText,
       ),
 
       appBarTheme: const AppBarTheme(
@@ -135,7 +133,6 @@ class AppTheme {
         primary: neonGreen,
         secondary: neonGreen,
         surface: cardDark,
-        background: darkGreen,
       ),
       
       // AppBar Theme

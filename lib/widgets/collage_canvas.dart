@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../models/collage_layout.dart';
 
 class CollageCanvas extends StatefulWidget {
@@ -15,7 +14,7 @@ class CollageCanvas extends StatefulWidget {
   final GlobalKey? repaintKey; // For capturing as image
 
   const CollageCanvas({
-    Key? key,
+    super.key,
     required this.layout,
     required this.imagePaths,
     this.onImageTransformed,
@@ -24,7 +23,7 @@ class CollageCanvas extends StatefulWidget {
     this.fontFamily,
     this.textColor,
     this.repaintKey,
-  }) : super(key: key);
+  });
 
   @override
   State<CollageCanvas> createState() => _CollageCanvasState();
@@ -44,7 +43,7 @@ class _CollageCanvasState extends State<CollageCanvas> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -203,7 +202,7 @@ class _CollageCanvasState extends State<CollageCanvas> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.6),
+          color: Colors.black.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
@@ -216,7 +215,7 @@ class _CollageCanvasState extends State<CollageCanvas> {
             fontFamily: widget.fontFamily,
             shadows: [
               Shadow(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 offset: const Offset(1, 1),
                 blurRadius: 3,
               ),

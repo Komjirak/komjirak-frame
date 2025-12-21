@@ -7,12 +7,12 @@ class PhotoGridItem extends StatelessWidget {
   final int? selectionIndex;
 
   const PhotoGridItem({
-    Key? key,
+    super.key,
     required this.imagePath,
     required this.isSelected,
     required this.onTap,
     this.selectionIndex,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,7 @@ class PhotoGridItem extends StatelessWidget {
                   color: Theme.of(context).primaryColor,
                   width: 3,
                 ),
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
               ),
             ),
           if (isSelected && selectionIndex != null)

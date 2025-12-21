@@ -3,7 +3,7 @@ import '../../models/collage_layout.dart';
 import '../../widgets/collage_canvas.dart';
 
 class PreviewScreen extends StatelessWidget {
-  const PreviewScreen({Key? key}) : super(key: key);
+  const PreviewScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

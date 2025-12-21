@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -60,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 gradient: RadialGradient(
                   colors: [
                     (isDark ? const Color(0xFF2BEE79) : const Color(0xFF2BEE79))
-                        .withOpacity(isDark ? 0.1 : 0.2),
+                        .withValues(alpha: isDark ? 0.1 : 0.2),
                     Colors.transparent,
                   ],
                 ),
@@ -78,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 gradient: RadialGradient(
                   colors: [
                     (isDark ? Colors.purple.shade900 : Colors.purple.shade300)
-                        .withOpacity(isDark ? 0.2 : 0.3),
+                        .withValues(alpha: isDark ? 0.2 : 0.3),
                     Colors.transparent,
                   ],
                 ),
@@ -96,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 gradient: RadialGradient(
                   colors: [
                     (isDark ? Colors.blue.shade900 : Colors.blue.shade200)
-                        .withOpacity(isDark ? 0.1 : 0.2),
+                        .withValues(alpha: isDark ? 0.1 : 0.2),
                     Colors.transparent,
                   ],
                 ),
@@ -131,7 +131,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           borderRadius: BorderRadius.circular(40),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF2BEE79).withOpacity(isDark ? 0.2 : 0.4),
+                              color: const Color(0xFF2BEE79).withValues(alpha: isDark ? 0.2 : 0.4),
                               blurRadius: 80,
                               spreadRadius: 10,
                             ),
@@ -147,13 +147,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                           borderRadius: BorderRadius.circular(40),
                           border: Border.all(
                             color: isDark 
-                                ? Colors.white.withOpacity(0.05)
-                                : Colors.white.withOpacity(0.6),
+                                ? Colors.white.withValues(alpha: 0.05)
+                                : Colors.white.withValues(alpha: 0.6),
                             width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDark ? 0.5 : 0.1),
+                              color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.1),
                               blurRadius: 40,
                               offset: const Offset(0, 20),
                             ),
@@ -177,7 +177,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
+                                color: Colors.black.withValues(alpha: 0.3),
                                 blurRadius: 10,
                               ),
                             ],
@@ -265,7 +265,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       height: 6,
                       decoration: BoxDecoration(
                         color: isDark 
-                            ? Colors.white.withOpacity(0.05)
+                            ? Colors.white.withValues(alpha: 0.05)
                             : Colors.grey.shade200,
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -278,7 +278,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF2BEE79).withOpacity(0.6),
+                                color: const Color(0xFF2BEE79).withValues(alpha: 0.6),
                                 blurRadius: 15,
                               ),
                             ],
@@ -296,7 +296,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   curve: Curves.easeInOut,
                   builder: (context, value, child) {
                     return Opacity(
-                      opacity: 0.5 + (value * 0.5 * (1 + 0.3 * (_controller.value % 1))),
+                      opacity: (0.4 + value * 0.6).clamp(0.0, 1.0),
                       child: child,
                     );
                   },

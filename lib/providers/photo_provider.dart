@@ -8,7 +8,7 @@ class PhotoProvider with ChangeNotifier {
   int get photoCount => _selectedPhotos.length;
   int get remainingSlots => maxPhotos - _selectedPhotos.length;
   bool get canAddMore => _selectedPhotos.length < maxPhotos;
-  bool get hasMinimumPhotos => _selectedPhotos.length >= 1;
+  bool get hasMinimumPhotos => _selectedPhotos.isNotEmpty;
 
   void addPhoto(String photoPath) {
     if (canAddMore && !_selectedPhotos.contains(photoPath)) {

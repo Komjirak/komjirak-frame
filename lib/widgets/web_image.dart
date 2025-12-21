@@ -10,10 +10,10 @@ class WebCompatibleImage extends StatefulWidget {
   final BoxFit fit;
 
   const WebCompatibleImage({
-    Key? key,
+    super.key,
     required this.imageFile,
     this.fit = BoxFit.cover,
-  }) : super(key: key);
+  });
 
   @override
   State<WebCompatibleImage> createState() => _WebCompatibleImageState();

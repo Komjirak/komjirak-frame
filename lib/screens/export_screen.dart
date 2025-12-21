@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import '../services/storage_service.dart';
 import '../services/share_service.dart';
 import '../services/image_service.dart';
-import '../widgets/web_image.dart';
 
 enum ExportQuality {
   high,
@@ -18,10 +16,10 @@ class ExportScreen extends StatefulWidget {
   final Widget? collagePreview;
 
   const ExportScreen({
-    Key? key,
+    super.key,
     this.collageImagePath,
     this.collagePreview,
-  }) : super(key: key);
+  });
 
   @override
   State<ExportScreen> createState() => _ExportScreenState();
@@ -83,7 +81,7 @@ class _ExportScreenState extends State<ExportScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -191,14 +189,7 @@ class _ExportScreenState extends State<ExportScreen> {
       ),
       trailing: Radio<ExportQuality>(
         value: quality,
-        groupValue: _selectedQuality,
-        onChanged: (ExportQuality? value) {
-          if (value != null) {
-            setState(() {
-              _selectedQuality = value;
-            });
-          }
-        },
+        toggleable: true,
       ),
       onTap: () {
         setState(() {
@@ -299,7 +290,7 @@ class _ExportScreenState extends State<ExportScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: (color ?? Colors.black).withOpacity(0.3),
+                  color: (color ?? Colors.black).withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -556,6 +547,7 @@ class _ExportScreenState extends State<ExportScreen> {
         ),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -575,6 +567,7 @@ class _ExportScreenState extends State<ExportScreen> {
         ),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
@@ -594,6 +587,7 @@ class _ExportScreenState extends State<ExportScreen> {
         ),
         backgroundColor: Colors.blue,
         behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),

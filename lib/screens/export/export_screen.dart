@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/collage_layout.dart';
 
 class ExportScreen extends StatefulWidget {
-  const ExportScreen({Key? key}) : super(key: key);
+  const ExportScreen({super.key});
 
   @override
   State<ExportScreen> createState() => _ExportScreenState();
@@ -13,9 +12,6 @@ class _ExportScreenState extends State<ExportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final layout = args?['layout'] as CollageLayout?;
-    final photos = args?['photos'] as List<String>? ?? [];
 
     return Scaffold(
       appBar: AppBar(
@@ -114,13 +110,13 @@ class _ExportScreenState extends State<ExportScreen> {
   }
 
   Widget _buildQualityOption(String title, String subtitle, bool isSelected) {
-    return RadioListTile<bool>(
-      value: isSelected,
-      groupValue: true,
-      onChanged: (value) {},
+    return ListTile(
       title: Text(title),
       subtitle: Text(subtitle),
-      activeColor: Theme.of(context).primaryColor,
+      trailing: Radio<bool>(
+        value: isSelected,
+        toggleable: true,
+      ),
     );
   }
 

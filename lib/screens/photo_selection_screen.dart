@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/web_image.dart';
@@ -70,6 +69,8 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
         content: Text('Maximum $_maxPhotos photos allowed'),
         backgroundColor: Colors.orange,
         duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -80,6 +81,8 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
         content: Text(message),
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -91,6 +94,8 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
           content: Text('Please select at least one photo'),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
         ),
       );
       return;
@@ -252,7 +257,7 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.7),
+                                  color: Colors.black.withValues(alpha: 0.7),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -272,7 +277,7 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
                               child: Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.8),
+                                  color: Colors.red.withValues(alpha: 0.8),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(

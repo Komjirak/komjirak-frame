@@ -4,7 +4,7 @@ import '../providers/project_provider.dart';
 import '../models/project_model.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -128,10 +128,14 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Start fresh with new Gen Z...',
-                style: TextStyle(color: Colors.white70),
+              const Flexible(
+                child: Text(
+                  'Start fresh with new Gen Z...',
+                  style: TextStyle(color: Colors.white70),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pushNamed(context, '/photo-selection');

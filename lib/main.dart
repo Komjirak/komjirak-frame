@@ -27,9 +27,9 @@ class KomjirakFrameApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Komjirak Frame',
-        theme: AppTheme.lightTheme,
+        theme: AppTheme.darkTheme,
         darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
+        themeMode: ThemeMode.dark,
         debugShowCheckedModeBanner: false,
         // Set the initial route to splash screen
         initialRoute: '/',

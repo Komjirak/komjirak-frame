@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/web_image.dart';
@@ -13,8 +12,24 @@ enum FrameLayout {
   bubbles,
 }
 
-class PreviewScreen extends StatelessWidget {
-  const PreviewScreen({Key? key}) : super(key: key);
+class PreviewScreen extends StatefulWidget {
+  const PreviewScreen({super.key});
+
+  @override
+  State<PreviewScreen> createState() => _PreviewScreenState();
+}
+
+class _PreviewScreenState extends State<PreviewScreen> {
+  late String _collageText;
+  late String _fontFamily;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _collageText = args?['text'] as String? ?? '';
+    _fontFamily = args?['font'] as String? ?? 'Roboto';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +37,6 @@ class PreviewScreen extends StatelessWidget {
     final photos = args?['photos'] as List<XFile>? ?? [];
     final layoutName = args?['layout'];
     final frameColor = args?['frameColor'] as Color? ?? Colors.white;
-    final font = args?['font'] as String? ?? 'Roboto';
-    final text = args?['text'] as String? ?? '';
     
     // Convert layout name string to FrameLayout enum
     FrameLayout layout = FrameLayout.classic;
@@ -58,7 +71,7 @@ class PreviewScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -68,7 +81,37 @@ class PreviewScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: AspectRatio(
                     aspectRatio: 3 / 4,
-                    child: _buildCollagePreview(photos, layout, frameColor),
+                    child: Stack(
+                      children: [
+                        _buildCollagePreview(photos, layout, frameColor),
+                        if (_collageText.isNotEmpty)
+                          Positioned(
+                            bottom: 20,
+                            left: 20,
+                            right: 20,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _collageText,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: _fontFamily,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -200,23 +243,30 @@ class PreviewScreen extends StatelessWidget {
         return _buildPolaroidLayout(photos, frameColor);
       case FrameLayout.bubbles:
         return _buildBubblesLayout(photos, frameColor);
-      default:
-        return _buildClassicLayout(photos, frameColor);
     }
   }
 
-  Widget _buildClassicLayout(List<XFile> photos, Color frameColor) {
+  int _gridColumns(int count) {
+    if (count <= 1) return 1;
+    if (count <= 4) return 2;
+    if (count <= 9) return 3;
+    return 4;
+  }
+
+  Widget _buildAdaptiveGrid(List<XFile> photos, Color backgroundColor,
+      {double childAspectRatio = 1}) {
     return Container(
-      color: frameColor,
+      color: backgroundColor,
       padding: const EdgeInsets.all(16),
       child: GridView.builder(
         padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridColumns(photos.length),
           crossAxisSpacing: 8,
           mainAxisSpacing: 8,
+          childAspectRatio: childAspectRatio,
         ),
-        itemCount: photos.length > 4 ? 4 : photos.length,
+        itemCount: photos.length,
         itemBuilder: (context, index) {
           return _buildPhotoCell(photos, index);
         },
@@ -224,91 +274,103 @@ class PreviewScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildClassicLayout(List<XFile> photos, Color frameColor) {
+    return _buildAdaptiveGrid(photos, frameColor);
+  }
+
   Widget _buildSplitLayout(List<XFile> photos, Color frameColor) {
-    return Container(
-      color: frameColor,
-      child: Row(
-        children: [
-          Expanded(
-            child: photos.isNotEmpty
-                ? _buildPhotoCell(photos, 0)
-                : Container(color: Colors.grey[300]),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              children: [
-                Expanded(
-                  child: photos.length > 1
-                      ? _buildPhotoCell(photos, 1)
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: photos.length > 2
-                      ? _buildPhotoCell(photos, 2)
-                      : Container(color: Colors.grey[300]),
-                ),
-              ],
+    if (photos.length <= 3) {
+      return Container(
+        color: frameColor,
+        child: Row(
+          children: [
+            Expanded(
+              child: photos.isNotEmpty
+                  ? _buildPhotoCell(photos, 0)
+                  : Container(color: Colors.grey[300]),
             ),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: photos.length > 1
+                        ? _buildPhotoCell(photos, 1)
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: photos.length > 2
+                        ? _buildPhotoCell(photos, 2)
+                        : Container(color: Colors.grey[300]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _buildAdaptiveGrid(photos, frameColor);
   }
 
   Widget _buildMosaicLayout(List<XFile> photos, Color frameColor) {
-    return Container(
-      color: frameColor,
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                Expanded(
-                  child: photos.isNotEmpty
-                      ? _buildPhotoCell(photos, 0)
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: photos.length > 1
-                      ? _buildPhotoCell(photos, 1)
-                      : Container(color: Colors.grey[300]),
-                ),
-              ],
+    if (photos.length <= 5) {
+      return Container(
+        color: frameColor,
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: photos.isNotEmpty
+                        ? _buildPhotoCell(photos, 0)
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: photos.length > 1
+                        ? _buildPhotoCell(photos, 1)
+                        : Container(color: Colors.grey[300]),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            flex: 1,
-            child: Row(
-              children: [
-                Expanded(
-                  child: photos.length > 2
-                      ? _buildPhotoCell(photos, 2)
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: photos.length > 3
-                      ? _buildPhotoCell(photos, 3)
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: photos.length > 4
-                      ? _buildPhotoCell(photos, 4)
-                      : Container(color: Colors.grey[300]),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Expanded(
+              flex: 1,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: photos.length > 2
+                        ? _buildPhotoCell(photos, 2)
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: photos.length > 3
+                        ? _buildPhotoCell(photos, 3)
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: photos.length > 4
+                        ? _buildPhotoCell(photos, 4)
+                        : Container(color: Colors.grey[300]),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
+
+    return _buildAdaptiveGrid(photos, frameColor);
   }
 
   Widget _buildFilmLayout(List<XFile> photos, Color frameColor) {
@@ -335,16 +397,10 @@ class PreviewScreen extends StatelessWidget {
           const SizedBox(height: 8),
           // Photos
           Expanded(
-            child: Row(
-              children: List.generate(
-                photos.length > 3 ? 3 : photos.length,
-                (index) => Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: _buildPhotoCell(photos, index),
-                  ),
-                ),
-              ),
+            child: _buildAdaptiveGrid(
+              photos,
+              Colors.black,
+              childAspectRatio: 0.9,
             ),
           ),
           const SizedBox(height: 8),
@@ -374,13 +430,13 @@ class PreviewScreen extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: GridView.builder(
         padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridColumns(photos.length),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
           childAspectRatio: 0.8,
         ),
-        itemCount: photos.length > 4 ? 4 : photos.length,
+        itemCount: photos.length,
         itemBuilder: (context, index) {
           return Transform.rotate(
             angle: (index % 2 == 0) ? -0.05 : 0.05,
@@ -389,7 +445,7 @@ class PreviewScreen extends StatelessWidget {
                 color: frameColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(2, 4),
                   ),
@@ -416,43 +472,47 @@ class PreviewScreen extends StatelessWidget {
   }
 
   Widget _buildBubblesLayout(List<XFile> photos, Color frameColor) {
-    return Container(
-      color: Colors.grey[100],
-      child: Stack(
-        children: [
-          if (photos.isNotEmpty)
-            Positioned(
-              top: 20,
-              left: 20,
-              child: _buildCircularPhoto(photos, 0, frameColor, 120),
-            ),
-          if (photos.length > 1)
-            Positioned(
-              top: 40,
-              right: 30,
-              child: _buildCircularPhoto(photos, 1, frameColor, 100),
-            ),
-          if (photos.length > 2)
-            Positioned(
-              bottom: 80,
-              left: 40,
-              child: _buildCircularPhoto(photos, 2, frameColor, 90),
-            ),
-          if (photos.length > 3)
-            Positioned(
-              bottom: 40,
-              right: 40,
-              child: _buildCircularPhoto(photos, 3, frameColor, 110),
-            ),
-          if (photos.length > 4)
-            Positioned(
-              top: 150,
-              left: 150,
-              child: _buildCircularPhoto(photos, 4, frameColor, 80),
-            ),
-        ],
-      ),
-    );
+    if (photos.length <= 5) {
+      return Container(
+        color: Colors.grey[100],
+        child: Stack(
+          children: [
+            if (photos.isNotEmpty)
+              Positioned(
+                top: 20,
+                left: 20,
+                child: _buildCircularPhoto(photos, 0, frameColor, 120),
+              ),
+            if (photos.length > 1)
+              Positioned(
+                top: 40,
+                right: 30,
+                child: _buildCircularPhoto(photos, 1, frameColor, 100),
+              ),
+            if (photos.length > 2)
+              Positioned(
+                bottom: 80,
+                left: 40,
+                child: _buildCircularPhoto(photos, 2, frameColor, 90),
+              ),
+            if (photos.length > 3)
+              Positioned(
+                bottom: 40,
+                right: 40,
+                child: _buildCircularPhoto(photos, 3, frameColor, 110),
+              ),
+            if (photos.length > 4)
+              Positioned(
+                top: 150,
+                left: 150,
+                child: _buildCircularPhoto(photos, 4, frameColor, 80),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return _buildAdaptiveGrid(photos, Colors.grey[100] ?? Colors.white);
   }
 
   Widget _buildCircularPhoto(List<XFile> photos, int index, Color frameColor, double size) {
@@ -464,7 +524,7 @@ class PreviewScreen extends StatelessWidget {
         border: Border.all(color: frameColor, width: 4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(2, 4),
           ),
@@ -512,7 +572,7 @@ class PreviewScreen extends StatelessWidget {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: color.withOpacity(0.3),
+                  color: color.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),

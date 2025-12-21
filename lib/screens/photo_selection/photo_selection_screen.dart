@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/photo_grid_item.dart';
 
 class PhotoSelectionScreen extends StatefulWidget {
-  const PhotoSelectionScreen({Key? key}) : super(key: key);
+  const PhotoSelectionScreen({super.key});
 
   @override
   State<PhotoSelectionScreen> createState() => _PhotoSelectionScreenState();
@@ -35,7 +35,7 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
           if (_selectedPhotos.isNotEmpty)
             Container(
               padding: const EdgeInsets.all(16),
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               child: Row(
                 children: [
                   Icon(

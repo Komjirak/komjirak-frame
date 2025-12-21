@@ -1,37 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../widgets/web_image.dart';
+
+// Frame layout types
+enum FrameLayout { classic, split, mosaic, film, polaroid, bubbles }
+
+// Toggle between frame and font selector
+enum SelectorMode { frame, font }
 
 class CollageEditScreen extends StatefulWidget {
   final List<XFile> photos;
 
   const CollageEditScreen({
-    Key? key,
+    super.key,
     required this.photos,
-  }) : super(key: key);
+  });
 
   @override
   State<CollageEditScreen> createState() => _CollageEditScreenState();
 }
 
 class _CollageEditScreenState extends State<CollageEditScreen> {
-  // Frame layout types
-  enum FrameLayout {
-    classic,
-    split,
-    mosaic,
-    film,
-    polaroid,
-    bubbles,
-  }
-
-  // Toggle between frame and font selector
-  enum SelectorMode {
-    frame,
-    font,
-  }
-
   FrameLayout _selectedLayout = FrameLayout.classic;
   SelectorMode _selectorMode = SelectorMode.frame;
   String _selectedFont = 'Roboto';
@@ -81,7 +70,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -93,7 +82,6 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
               ),
             ),
           ),
-
           // Selector toggle buttons
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -141,7 +129,6 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
               ],
             ),
           ),
-
           // Selector content area
           Expanded(
             flex: 2,
@@ -185,115 +172,134 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
         return _buildPolaroidLayout();
       case FrameLayout.bubbles:
         return _buildBubblesLayout();
-      default:
-        return _buildClassicLayout();
     }
   }
 
-  Widget _buildClassicLayout() {
+  int _gridColumns(int count) {
+    if (count <= 1) return 1;
+    if (count <= 4) return 2;
+    if (count <= 9) return 3;
+    return 4;
+  }
+
+  Widget _buildAdaptiveGrid(List<XFile> photos, Color backgroundColor,
+      {double childAspectRatio = 1}) {
     return Container(
-      color: _selectedFrameColor,
+      color: backgroundColor,
       padding: const EdgeInsets.all(8),
       child: GridView.builder(
         padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridColumns(photos.length),
           crossAxisSpacing: 8,
           mainAxisSpacing: 8,
+          childAspectRatio: childAspectRatio,
         ),
-        itemCount: widget.photos.length > 4 ? 4 : widget.photos.length,
+        itemCount: photos.length,
         itemBuilder: (context, index) {
-          return _buildPhotoTile(widget.photos[index]);
+          return _buildPhotoTile(photos[index]);
         },
       ),
     );
   }
 
+  Widget _buildClassicLayout() {
+    return _buildAdaptiveGrid(widget.photos, _selectedFrameColor);
+  }
+
   Widget _buildSplitLayout() {
-    return Container(
-      color: _selectedFrameColor,
-      child: Row(
-        children: [
-          Expanded(
-            child: widget.photos.isNotEmpty
-                ? _buildPhotoTile(widget.photos[0])
-                : Container(color: Colors.grey[300]),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              children: [
-                Expanded(
-                  child: widget.photos.length > 1
-                      ? _buildPhotoTile(widget.photos[1])
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: widget.photos.length > 2
-                      ? _buildPhotoTile(widget.photos[2])
-                      : Container(color: Colors.grey[300]),
-                ),
-              ],
+    if (widget.photos.length <= 3) {
+      return Container(
+        color: _selectedFrameColor,
+        child: Row(
+          children: [
+            Expanded(
+              child: widget.photos.isNotEmpty
+                  ? _buildPhotoTile(widget.photos[0])
+                  : Container(color: Colors.grey[300]),
             ),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: widget.photos.length > 1
+                        ? _buildPhotoTile(widget.photos[1])
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: widget.photos.length > 2
+                        ? _buildPhotoTile(widget.photos[2])
+                        : Container(color: Colors.grey[300]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _buildAdaptiveGrid(widget.photos, _selectedFrameColor);
   }
 
   Widget _buildMosaicLayout() {
-    return Container(
-      color: _selectedFrameColor,
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                Expanded(
-                  child: widget.photos.isNotEmpty
-                      ? _buildPhotoTile(widget.photos[0])
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: widget.photos.length > 1
-                      ? _buildPhotoTile(widget.photos[1])
-                      : Container(color: Colors.grey[300]),
-                ),
-              ],
+    if (widget.photos.length <= 5) {
+      return Container(
+        color: _selectedFrameColor,
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: widget.photos.isNotEmpty
+                        ? _buildPhotoTile(widget.photos[0])
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: widget.photos.length > 1
+                        ? _buildPhotoTile(widget.photos[1])
+                        : Container(color: Colors.grey[300]),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            flex: 1,
-            child: Row(
-              children: [
-                Expanded(
-                  child: widget.photos.length > 2
-                      ? _buildPhotoTile(widget.photos[2])
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: widget.photos.length > 3
-                      ? _buildPhotoTile(widget.photos[3])
-                      : Container(color: Colors.grey[300]),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: widget.photos.length > 4
-                      ? _buildPhotoTile(widget.photos[4])
-                      : Container(color: Colors.grey[300]),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Expanded(
+              flex: 1,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: widget.photos.length > 2
+                        ? _buildPhotoTile(widget.photos[2])
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: widget.photos.length > 3
+                        ? _buildPhotoTile(widget.photos[3])
+                        : Container(color: Colors.grey[300]),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: widget.photos.length > 4
+                        ? _buildPhotoTile(widget.photos[4])
+                        : Container(color: Colors.grey[300]),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
+
+    return _buildAdaptiveGrid(widget.photos, _selectedFrameColor);
   }
 
   Widget _buildFilmLayout() {
@@ -302,7 +308,6 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Film strip holes
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(
@@ -318,21 +323,14 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          // Photos
           Expanded(
-            child: Row(
-              children: widget.photos.take(3).map((photo) {
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: _buildPhotoTile(photo),
-                  ),
-                );
-              }).toList(),
+            child: _buildAdaptiveGrid(
+              widget.photos,
+              Colors.black,
+              childAspectRatio: 0.9,
             ),
           ),
           const SizedBox(height: 8),
-          // Film strip holes
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(
@@ -358,13 +356,13 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
       padding: const EdgeInsets.all(16),
       child: GridView.builder(
         padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridColumns(widget.photos.length),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
           childAspectRatio: 0.8,
         ),
-        itemCount: widget.photos.length > 4 ? 4 : widget.photos.length,
+        itemCount: widget.photos.length,
         itemBuilder: (context, index) {
           return Transform.rotate(
             angle: (index % 2 == 0) ? -0.05 : 0.05,
@@ -373,7 +371,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                 color: _selectedFrameColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(2, 4),
                   ),
@@ -386,9 +384,10 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                     flex: 4,
                     child: _buildPhotoTile(widget.photos[index]),
                   ),
-                  const Expanded(
+                  const SizedBox(height: 12),
+                  Expanded(
                     flex: 1,
-                    child: SizedBox(),
+                    child: Container(color: Colors.white),
                   ),
                 ],
               ),
@@ -400,43 +399,47 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 
   Widget _buildBubblesLayout() {
-    return Container(
-      color: Colors.grey[100],
-      child: Stack(
-        children: [
-          if (widget.photos.isNotEmpty)
-            Positioned(
-              top: 20,
-              left: 20,
-              child: _buildCircularPhoto(widget.photos[0], 120),
-            ),
-          if (widget.photos.length > 1)
-            Positioned(
-              top: 40,
-              right: 30,
-              child: _buildCircularPhoto(widget.photos[1], 100),
-            ),
-          if (widget.photos.length > 2)
-            Positioned(
-              bottom: 80,
-              left: 40,
-              child: _buildCircularPhoto(widget.photos[2], 90),
-            ),
-          if (widget.photos.length > 3)
-            Positioned(
-              bottom: 40,
-              right: 40,
-              child: _buildCircularPhoto(widget.photos[3], 110),
-            ),
-          if (widget.photos.length > 4)
-            Positioned(
-              top: 150,
-              left: 150,
-              child: _buildCircularPhoto(widget.photos[4], 80),
-            ),
-        ],
-      ),
-    );
+    if (widget.photos.length <= 5) {
+      return Container(
+        color: Colors.grey[100],
+        child: Stack(
+          children: [
+            if (widget.photos.isNotEmpty)
+              Positioned(
+                top: 20,
+                left: 20,
+                child: _buildCircularPhoto(widget.photos[0], 120),
+              ),
+            if (widget.photos.length > 1)
+              Positioned(
+                top: 40,
+                right: 30,
+                child: _buildCircularPhoto(widget.photos[1], 100),
+              ),
+            if (widget.photos.length > 2)
+              Positioned(
+                bottom: 80,
+                left: 40,
+                child: _buildCircularPhoto(widget.photos[2], 90),
+              ),
+            if (widget.photos.length > 3)
+              Positioned(
+                bottom: 40,
+                right: 40,
+                child: _buildCircularPhoto(widget.photos[3], 110),
+              ),
+            if (widget.photos.length > 4)
+              Positioned(
+                top: 150,
+                left: 150,
+                child: _buildCircularPhoto(widget.photos[4], 80),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return _buildAdaptiveGrid(widget.photos, Colors.grey[100] ?? Colors.white);
   }
 
   Widget _buildCircularPhoto(XFile photo, double size) {
@@ -448,7 +451,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
         border: Border.all(color: _selectedFrameColor, width: 4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(2, 4),
           ),
@@ -495,8 +498,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
               _buildFrameOption(FrameLayout.split, Icons.view_column, 'Split'),
               _buildFrameOption(FrameLayout.mosaic, Icons.dashboard, 'Mosaic'),
               _buildFrameOption(FrameLayout.film, Icons.movie, 'Film'),
-              _buildFrameOption(
-                  FrameLayout.polaroid, Icons.photo_camera, 'Polaroid'),
+              _buildFrameOption(FrameLayout.polaroid, Icons.photo_camera, 'Polaroid'),
               _buildFrameOption(FrameLayout.bubbles, Icons.bubble_chart, 'Bubbles'),
             ],
           ),
@@ -599,45 +601,40 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: ListView.builder(
-            itemCount: _availableFonts.length,
-            itemBuilder: (context, index) {
-              final font = _availableFonts[index];
-              final isSelected = _selectedFont == font;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _availableFonts.map((font) {
+                final isSelected = _selectedFont == font;
+                return ChoiceChip(
+                  label: Text(
+                    font,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                  labelStyle: TextStyle(
+                    color: isSelected ? Theme.of(context).primaryColor : Colors.black,
+                  ),
                   selected: isSelected,
-                  selectedTileColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                  backgroundColor: Colors.grey[100],
+                  shape: StadiumBorder(
                     side: BorderSide(
                       color: isSelected
                           ? Theme.of(context).primaryColor
-                          : Colors.grey[300]!,
-                      width: isSelected ? 2 : 1,
+                          : Colors.grey.shade300,
                     ),
                   ),
-                  title: Text(
-                    font,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                  trailing: isSelected
-                      ? Icon(
-                          Icons.check_circle,
-                          color: Theme.of(context).primaryColor,
-                        )
-                      : null,
-                  onTap: () {
+                  onSelected: (_) {
                     setState(() {
                       _selectedFont = font;
                     });
                   },
-                ),
-              );
-            },
+                );
+              }).toList(),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -658,8 +655,6 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 
   void _navigateToPreview() {
-    // Navigate to preview screen with selected options
-    // Note: You'll need to create the PreviewScreen separately
     Navigator.pushNamed(
       context,
       '/preview',
