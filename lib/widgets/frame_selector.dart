@@ -91,6 +91,10 @@ class FrameSelector extends StatelessWidget {
         return Icons.grid_on;
       case LayoutType.magazine:
         return Icons.auto_stories;
+      case LayoutType.storybook:
+        return Icons.menu_book;
+      case LayoutType.collage:
+        return Icons.collections;
     }
   }
 }

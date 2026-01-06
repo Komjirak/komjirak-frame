@@ -20,8 +20,14 @@ class StorageService {
         return storage.isGranted;
       }
     } else if (Platform.isIOS) {
-      final status = await Permission.photos.request();
-      return status.isGranted;
+      // For iOS 14+, we need to request add-only permission for saving photos
+      final status = await Permission.photosAddOnly.request();
+      if (status.isGranted) {
+        return true;
+      }
+      // Fallback to full photos permission if add-only is denied
+      final photosStatus = await Permission.photos.request();
+      return photosStatus.isGranted || photosStatus.isLimited;
     }
     return true; // For web and other platforms
   }
@@ -62,22 +68,97 @@ class StorageService {
 
   static Future<bool> saveToGallery(File imageFile) async {
     try {
+      debugPrint('[StorageService] saveToGallery called with file: ${imageFile.path}');
+      
+      // Check if file exists
+      if (!await imageFile.exists()) {
+        debugPrint('[StorageService] ❌ Image file does not exist!');
+        return false;
+      }
+      
+      final fileSize = await imageFile.length();
+      debugPrint('[StorageService] File exists, size: $fileSize bytes');
+      
+      // For macOS, save to Downloads folder instead of using ImageGallerySaver
+      if (Platform.isMacOS) {
+        debugPrint('[StorageService] macOS detected, saving to Downloads folder');
+        return await _saveToDownloadsFolder(imageFile);
+      }
+      
+      debugPrint('[StorageService] Requesting permissions...');
       final hasPermission = await requestPermissions();
+      debugPrint('[StorageService] Permission result: $hasPermission');
+      
       if (!hasPermission) {
-        debugPrint('Gallery permission denied');
+        debugPrint('[StorageService] ❌ Gallery permission denied');
         return false;
       }
 
+      debugPrint('[StorageService] Reading image bytes...');
       final bytes = await imageFile.readAsBytes();
+      debugPrint('[StorageService] Bytes read: ${bytes.length}');
+      
+      final imageName = 'komjirak_frame_${DateTime.now().millisecondsSinceEpoch}';
+      debugPrint('[StorageService] Saving to gallery with name: $imageName');
+      
       final result = await ImageGallerySaver.saveImage(
         bytes,
         quality: 100,
-        name: 'komjirak_frame_${DateTime.now().millisecondsSinceEpoch}',
+        name: imageName,
       );
 
-      return result['isSuccess'] ?? false;
-    } catch (e) {
-      debugPrint('Error saving to gallery: $e');
+      debugPrint('[StorageService] Save result: $result');
+      final success = result['isSuccess'] ?? false;
+      
+      if (success) {
+        debugPrint('[StorageService] ✅ Image saved successfully to gallery!');
+        if (result['filePath'] != null) {
+          debugPrint('[StorageService] Saved to: ${result['filePath']}');
+        }
+      } else {
+        debugPrint('[StorageService] ❌ Save failed. Result: $result');
+      }
+      
+      return success;
+    } catch (e, stackTrace) {
+      debugPrint('[StorageService] ❌ Error saving to gallery: $e');
+      debugPrint('[StorageService] Stack trace: $stackTrace');
+      return false;
+    }
+  }
+
+  static Future<bool> _saveToDownloadsFolder(File imageFile) async {
+    try {
+      // For macOS sandbox, always use application documents directory
+      debugPrint('[StorageService] Using application documents directory');
+      final documentsDir = await getApplicationDocumentsDirectory();
+      
+      // Create saved_collages subdirectory
+      final savedDir = Directory('${documentsDir.path}/saved_collages');
+      if (!await savedDir.exists()) {
+        await savedDir.create(recursive: true);
+        debugPrint('[StorageService] Created saved_collages directory');
+      }
+      
+      final downloadsDir = savedDir;
+      
+      final fileName = 'komjirak_frame_${DateTime.now().millisecondsSinceEpoch}.png';
+      final targetPath = '${downloadsDir.path}/$fileName';
+      
+      debugPrint('[StorageService] Copying file to: $targetPath');
+      await imageFile.copy(targetPath);
+      
+      final savedFile = File(targetPath);
+      if (await savedFile.exists()) {
+        debugPrint('[StorageService] ✅ Image saved successfully: $targetPath');
+        return true;
+      } else {
+        debugPrint('[StorageService] ❌ File not found after copy');
+        return false;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[StorageService] ❌ Error saving to Downloads: $e');
+      debugPrint('[StorageService] Stack trace: $stackTrace');
       return false;
     }
   }

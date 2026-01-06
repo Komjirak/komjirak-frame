@@ -28,6 +28,7 @@ class PreviewScreen extends StatelessWidget {
               ? CollageCanvas(
                   layout: layout,
                   imagePaths: photos,
+                  cornerRadius: 0.0,
                 )
               : const Text('No layout selected'),
         ),

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/rendering.dart';
+import 'dart:ui' as ui;
 import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/storage_service.dart';
 import '../services/share_service.dart';
 import '../services/image_service.dart';
+import '../widgets/collage_canvas.dart';
+import '../models/collage_layout.dart';
 
 enum ExportQuality {
   high,
@@ -31,9 +36,48 @@ class _ExportScreenState extends State<ExportScreen> {
   bool _addWatermark = false;
   bool _isSaving = false;
   bool _isSaved = false;
+  final GlobalKey _repaintKey = GlobalKey();
+
+  // Collage parameters
+  List<String> _imagePaths = [];
+  CollageLayout? _layout;
+  Color _frameColor = Colors.white;
+  Color _textColor = Colors.white;
+  double _frameSpacing = 2.0;
+  double _cornerRadius = 0.0;
+  double _aspectRatio = 1.0;
+  Offset? _textPosition;
+  String _collageText = '';
+  String _fontFamily = 'Roboto';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Extract arguments once
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null) {
+      _imagePaths = args['imagePaths'] as List<String>? ?? [];
+      _layout = args['layout'] as CollageLayout?;
+      _frameColor = args['frameColor'] as Color? ?? Colors.white;
+      _textColor = args['textColor'] as Color? ?? Colors.white;
+      _frameSpacing = args['frameSpacing'] as double? ?? 2.0;
+      _cornerRadius = args['cornerRadius'] as double? ?? 0.0;
+      _aspectRatio = args['aspectRatio'] as double? ?? 1.0;
+      _textPosition = args['textPosition'] as Offset?;
+      _collageText = args['text'] as String? ?? '';
+      _fontFamily = args['font'] as String? ?? 'Roboto';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_layout == null) {
+      return const Scaffold(
+        body: Center(child: Text('No layout data')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Export Collage'),
@@ -74,39 +118,30 @@ class _ExportScreenState extends State<ExportScreen> {
   }
 
   Widget _buildCollagePreview() {
+    if (_layout == null) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        height: 300,
+        color: Colors.grey[800],
+        child: const Center(child: Text('No layout')),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: widget.collagePreview ??
-              (widget.collageImagePath != null
-                  ? Image.network(
-                      widget.collageImagePath!,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      color: Colors.grey[800],
-                      child: const Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    )),
+      child: RepaintBoundary(
+        key: _repaintKey,
+        child: CollageCanvas(
+          layout: _layout!,
+          imagePaths: _imagePaths,
+          frameColor: _frameColor,
+          overlayText: _collageText.isEmpty ? null : _collageText,
+          fontFamily: _fontFamily,
+          textColor: _textColor,
+          frameSpacing: _frameSpacing,
+          cornerRadius: _cornerRadius,
+          aspectRatio: _aspectRatio,
+          textPosition: _textPosition,
         ),
       ),
     );
@@ -419,45 +454,79 @@ class _ExportScreenState extends State<ExportScreen> {
   }
 
   Future<void> _saveToGallery() async {
+    print('[SaveToGallery] Starting save process...');
     setState(() {
       _isSaving = true;
     });
 
     try {
-      if (widget.collageImagePath == null && widget.collagePreview == null) {
-        throw Exception('No collage image to save');
+      // Check if RepaintBoundary is ready
+      if (_repaintKey.currentContext == null) {
+        throw Exception('RepaintBoundary context is null. Widget not rendered yet.');
       }
+      
+      print('[SaveToGallery] Finding RenderRepaintBoundary...');
+      final renderObject = _repaintKey.currentContext!.findRenderObject();
+      if (renderObject == null) {
+        throw Exception('RenderObject is null');
+      }
+      
+      if (renderObject is! RenderRepaintBoundary) {
+        throw Exception('RenderObject is not a RenderRepaintBoundary');
+      }
+      
+      final RenderRepaintBoundary boundary = renderObject;
+      
+      print('[SaveToGallery] Capturing widget as image...');
+      // Capture at high resolution
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      print('[SaveToGallery] Image captured: ${image.width}x${image.height}');
+      
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      
+      if (byteData == null) {
+        throw Exception('Failed to convert image to bytes');
+      }
+      
+      print('[SaveToGallery] Image converted to bytes: ${byteData.lengthInBytes} bytes');
 
-      File? imageFile;
-      if (widget.collageImagePath != null) {
-        imageFile = File(widget.collageImagePath!);
-      } else {
-        // If we have a widget preview, we need to capture it
-        // This would typically be done in the preview/edit screen
-        throw Exception('Please generate the collage first');
-      }
+      // Convert to File
+      final buffer = byteData.buffer.asUint8List();
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/collage_${DateTime.now().millisecondsSinceEpoch}.png');
+      await tempFile.writeAsBytes(buffer);
+      print('[SaveToGallery] Temp file created: ${tempFile.path}');
 
       // Request permissions
+      print('[SaveToGallery] Requesting storage permissions...');
       final hasPermission = await StorageService.requestPermissions();
+      print('[SaveToGallery] Permission granted: $hasPermission');
+      
       if (!hasPermission) {
-        throw Exception('Storage permission denied');
+        throw Exception('Storage permission denied. Please grant permission in Settings.');
       }
 
       // Apply quality settings if needed
-      File? processedImage = imageFile;
+      File? processedImage = tempFile;
       int quality = _selectedQuality == ExportQuality.high
           ? 100
           : _selectedQuality == ExportQuality.medium
               ? 85
               : 70;
 
+      print('[SaveToGallery] Selected quality: $quality');
+
       if (quality < 100) {
-        processedImage = await ImageService.compressImage(imageFile, quality: quality);
-        processedImage ??= imageFile;
+        print('[SaveToGallery] Compressing image...');
+        processedImage = await ImageService.compressImage(tempFile, quality: quality);
+        processedImage ??= tempFile;
+        print('[SaveToGallery] Compression complete');
       }
 
       // Save to gallery
+      print('[SaveToGallery] Saving to gallery...');
       final success = await StorageService.saveToGallery(processedImage);
+      print('[SaveToGallery] Save result: $success');
 
       if (!mounted) return;
 
@@ -467,7 +536,11 @@ class _ExportScreenState extends State<ExportScreen> {
           _isSaved = true;
         });
 
-        _showSuccessSnackBar('Collage saved to gallery successfully!');
+        final message = Platform.isMacOS
+            ? 'Collage saved to Downloads folder successfully!'
+            : 'Collage saved to gallery successfully!';
+        _showSuccessSnackBar(message);
+        print('[SaveToGallery] ✅ Save completed successfully!');
 
         // Reset the saved state after 3 seconds
         Future.delayed(const Duration(seconds: 3), () {
@@ -478,9 +551,12 @@ class _ExportScreenState extends State<ExportScreen> {
           }
         });
       } else {
-        throw Exception('Failed to save to gallery');
+        throw Exception('SaveToGallery returned false - check StorageService logs');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[SaveToGallery] ❌ Error: $e');
+      print('[SaveToGallery] Stack trace: $stackTrace');
+      
       if (!mounted) return;
 
       setState(() {

@@ -7,6 +7,8 @@ enum LayoutType {
   bubbles,
   grid,
   magazine,
+  storybook,
+  collage,
 }
 
 class CollageLayout {
@@ -33,6 +35,12 @@ class FrameCell {
   final int rowSpan;
   final int columnSpan;
   final double? aspectRatio;
+  
+  // Custom bounds for dynamic sizing (0.0 to 1.0 normalized coordinates)
+  double? customLeft;
+  double? customTop;
+  double? customWidth;
+  double? customHeight;
 
   FrameCell({
     required this.row,
@@ -40,5 +48,28 @@ class FrameCell {
     this.rowSpan = 1,
     this.columnSpan = 1,
     this.aspectRatio,
+    this.customLeft,
+    this.customTop,
+    this.customWidth,
+    this.customHeight,
   });
+  
+  FrameCell copyWith({
+    double? customLeft,
+    double? customTop,
+    double? customWidth,
+    double? customHeight,
+  }) {
+    return FrameCell(
+      row: row,
+      column: column,
+      rowSpan: rowSpan,
+      columnSpan: columnSpan,
+      aspectRatio: aspectRatio,
+      customLeft: customLeft ?? this.customLeft,
+      customTop: customTop ?? this.customTop,
+      customWidth: customWidth ?? this.customWidth,
+      customHeight: customHeight ?? this.customHeight,
+    );
+  }
 }

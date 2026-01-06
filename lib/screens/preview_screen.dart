@@ -1,16 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../widgets/web_image.dart';
-
-// Frame layout types matching CollageEditScreen
-enum FrameLayout {
-  classic,
-  split,
-  mosaic,
-  film,
-  polaroid,
-  bubbles,
-}
+import '../widgets/collage_canvas.dart';
+import '../models/collage_layout.dart';
 
 class PreviewScreen extends StatefulWidget {
   const PreviewScreen({super.key});
@@ -22,6 +13,7 @@ class PreviewScreen extends StatefulWidget {
 class _PreviewScreenState extends State<PreviewScreen> {
   late String _collageText;
   late String _fontFamily;
+  bool _showWatermark = true;
 
   @override
   void didChangeDependencies() {
@@ -35,597 +27,574 @@ class _PreviewScreenState extends State<PreviewScreen> {
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final photos = args?['photos'] as List<XFile>? ?? [];
-    final layoutName = args?['layout'];
+    final imagePaths = args?['imagePaths'] as List<String>? ?? photos.map((p) => p.path).toList();
+    final layout = args?['layout'] as CollageLayout?;
     final frameColor = args?['frameColor'] as Color? ?? Colors.white;
+    final textColor = args?['textColor'] as Color? ?? Colors.white;
+    final frameSpacing = args?['frameSpacing'] as double? ?? 2.0;
+    final cornerRadius = args?['cornerRadius'] as double? ?? 0.0;
+    final aspectRatio = args?['aspectRatio'] as double? ?? 1.0;
+    final textPosition = args?['textPosition'] as Offset?;
     
-    // Convert layout name string to FrameLayout enum
-    FrameLayout layout = FrameLayout.classic;
-    if (layoutName != null) {
-      final layoutStr = layoutName.toString().split('.').last;
-      layout = FrameLayout.values.firstWhere(
-        (e) => e.toString().split('.').last == layoutStr,
-        orElse: () => FrameLayout.classic,
+    if (layout == null) {
+      return const Scaffold(
+        body: Center(child: Text('No layout selected')),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Preview'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => Navigator.pop(context),
-            tooltip: 'Edit',
+      backgroundColor: const Color(0xFF221019),
+      body: Stack(
+        children: [
+          // Background gradient orb
+          Positioned(
+            top: 80,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 256,
+                height: 256,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                      blurRadius: 100,
+                      spreadRadius: 50,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Main content
+          Column(
+            children: [
+              _buildAppBar(context),
+              Expanded(
+                child: _buildMainContent(
+                  context,
+                  layout,
+                  imagePaths,
+                  frameColor,
+                  textColor,
+                  frameSpacing,
+                  cornerRadius,
+                  aspectRatio,
+                  textPosition,
+                ),
+              ),
+              _buildBottomSheet(context, photos, imagePaths, layout, frameColor, textColor, frameSpacing, cornerRadius, aspectRatio, textPosition),
+            ],
           ),
         ],
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildAppBar(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF221019).withValues(alpha: 0.95),
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.white.withValues(alpha: 0.05),
+            width: 1,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+              const Text(
+                'It\'s a Masterpiece ✨',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.popUntil(context, (route) => route.isFirst),
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).primaryColor,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainContent(
+    BuildContext context,
+    CollageLayout layout,
+    List<String> imagePaths,
+    Color frameColor,
+    Color textColor,
+    double frameSpacing,
+    double cornerRadius,
+    double aspectRatio,
+    Offset? textPosition,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Preview Area
-          Expanded(
-            child: Center(
+          // Collage preview card
+          Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: AspectRatio(
+              aspectRatio: 4 / 5,
               child: Container(
-                margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(32),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 50,
+                      offset: const Offset(0, 20),
                     ),
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: AspectRatio(
-                    aspectRatio: 3 / 4,
-                    child: Stack(
-                      children: [
-                        _buildCollagePreview(photos, layout, frameColor),
-                        if (_collageText.isNotEmpty)
-                          Positioned(
-                            bottom: 20,
-                            left: 20,
-                            right: 20,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                  borderRadius: BorderRadius.circular(32),
+                  child: Stack(
+                    children: [
+                      CollageCanvas(
+                        layout: layout,
+                        imagePaths: imagePaths,
+                        frameColor: frameColor,
+                        overlayText: _collageText.isEmpty ? null : _collageText,
+                        fontFamily: _fontFamily,
+                        textColor: textColor,
+                        frameSpacing: frameSpacing,
+                        cornerRadius: cornerRadius,
+                        aspectRatio: aspectRatio,
+                        textPosition: textPosition,
+                      ),
+                      if (_showWatermark)
+                        Positioned(
+                          bottom: 16,
+                          right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                _collageText,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: _fontFamily,
-                                ),
+                            ),
+                            child: const Text(
+                              '✨ COLLAGE APP',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                letterSpacing: 1.2,
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-
-          // Quick Share Section
+          const SizedBox(height: 24),
+          // Watermark toggle
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Share to Socials',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildSocialButton(
-                      context,
-                      'Instagram',
-                      Icons.camera_alt,
-                      Colors.purple,
-                      () => _shareToInstagram(context),
-                    ),
-                    _buildSocialButton(
-                      context,
-                      'TikTok',
-                      Icons.music_note,
-                      Colors.black,
-                      () => _shareToTikTok(context),
-                    ),
-                    _buildSocialButton(
-                      context,
-                      'Snapchat',
-                      Icons.send,
-                      Colors.yellow,
-                      () => _shareToSnapchat(context),
-                    ),
-                    _buildSocialButton(
-                      context,
-                      'More',
-                      Icons.more_horiz,
-                      Colors.grey,
-                      () => _shareMore(context),
-                    ),
-                  ],
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 12,
                 ),
               ],
             ),
-          ),
-
-          // Action Buttons
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _shareCollage(context),
-                    icon: const Icon(Icons.ios_share),
-                    label: const Text('SHARE'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.branding_watermark,
+                          color: Theme.of(context).primaryColor,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'App Watermark',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _showWatermark = !_showWatermark;
+                      });
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _showWatermark 
+                            ? Theme.of(context).primaryColor 
+                            : Colors.grey.shade700,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: Align(
+                        alignment: _showWatermark ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomSheet(
+    BuildContext context,
+    List<XFile> photos,
+    List<String> imagePaths,
+    CollageLayout layout,
+    Color frameColor,
+    Color textColor,
+    double frameSpacing,
+    double cornerRadius,
+    double aspectRatio,
+    Offset? textPosition,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF221019),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(40),
+          topRight: Radius.circular(40),
+        ),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.05),
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 40,
+            offset: const Offset(0, -10),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 24),
+                width: 48,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade700.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(3),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
+              ),
+            ),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  // Save to Gallery button
+                  GestureDetector(
+                    onTap: () {
                       Navigator.pushNamed(
                         context,
                         '/export',
                         arguments: {
                           'photos': photos,
+                          'imagePaths': imagePaths,
                           'layout': layout,
                           'frameColor': frameColor,
+                          'textColor': textColor,
+                          'frameSpacing': frameSpacing,
+                          'cornerRadius': cornerRadius,
+                          'aspectRatio': aspectRatio,
+                          'textPosition': textPosition,
+                          'text': _collageText,
+                          'font': _fontFamily,
                         },
                       );
                     },
-                    icon: const Icon(Icons.download),
-                    label: const Text('SAVE TO GALLERY'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
+                    child: Container(
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).primaryColor.withValues(alpha: 0.6),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.download,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Save to Gallery',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCollagePreview(List<XFile> photos, FrameLayout layout, Color frameColor) {
-    if (photos.isEmpty) {
-      return Container(
-        color: Colors.grey[300],
-        child: const Center(
-          child: Text('No photos to preview'),
-        ),
-      );
-    }
-
-    switch (layout) {
-      case FrameLayout.classic:
-        return _buildClassicLayout(photos, frameColor);
-      case FrameLayout.split:
-        return _buildSplitLayout(photos, frameColor);
-      case FrameLayout.mosaic:
-        return _buildMosaicLayout(photos, frameColor);
-      case FrameLayout.film:
-        return _buildFilmLayout(photos, frameColor);
-      case FrameLayout.polaroid:
-        return _buildPolaroidLayout(photos, frameColor);
-      case FrameLayout.bubbles:
-        return _buildBubblesLayout(photos, frameColor);
-    }
-  }
-
-  int _gridColumns(int count) {
-    if (count <= 1) return 1;
-    if (count <= 4) return 2;
-    if (count <= 9) return 3;
-    return 4;
-  }
-
-  Widget _buildAdaptiveGrid(List<XFile> photos, Color backgroundColor,
-      {double childAspectRatio = 1}) {
-    return Container(
-      color: backgroundColor,
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
-        padding: EdgeInsets.zero,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _gridColumns(photos.length),
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: childAspectRatio,
-        ),
-        itemCount: photos.length,
-        itemBuilder: (context, index) {
-          return _buildPhotoCell(photos, index);
-        },
-      ),
-    );
-  }
-
-  Widget _buildClassicLayout(List<XFile> photos, Color frameColor) {
-    return _buildAdaptiveGrid(photos, frameColor);
-  }
-
-  Widget _buildSplitLayout(List<XFile> photos, Color frameColor) {
-    if (photos.length <= 3) {
-      return Container(
-        color: frameColor,
-        child: Row(
-          children: [
-            Expanded(
-              child: photos.isNotEmpty
-                  ? _buildPhotoCell(photos, 0)
-                  : Container(color: Colors.grey[300]),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: photos.length > 1
-                        ? _buildPhotoCell(photos, 1)
-                        : Container(color: Colors.grey[300]),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Share to label
+                  Text(
+                    'SHARE TO',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2.0,
+                      color: Colors.grey.shade400,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: photos.length > 2
-                        ? _buildPhotoCell(photos, 2)
-                        : Container(color: Colors.grey[300]),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Social share buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildSocialButton(
+                        'Story',
+                        Icons.add_a_photo,
+                        const Color(0xFFE1306C),
+                        isGradient: true,
+                      ),
+                      _buildSocialButton(
+                        'TikTok',
+                        Icons.music_note,
+                        Colors.black,
+                      ),
+                      _buildSocialButton(
+                        'Snap',
+                        Icons.notifications,
+                        const Color(0xFFFFFC00),
+                        iconColor: Colors.black,
+                      ),
+                      _buildSocialButton(
+                        'Copy',
+                        Icons.link,
+                        Colors.grey.shade800,
+                      ),
+                      _buildSocialButton(
+                        'More',
+                        Icons.more_horiz,
+                        Colors.transparent,
+                        hasBorder: true,
+                      ),
+                    ],
                   ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Start new collage link
+                  TextButton(
+                    onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+                    child: Text(
+                      'Start New Collage',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.8),
+                        decoration: TextDecoration.underline,
+                        decorationColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                        decorationThickness: 2,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
           ],
         ),
-      );
-    }
-
-    return _buildAdaptiveGrid(photos, frameColor);
-  }
-
-  Widget _buildMosaicLayout(List<XFile> photos, Color frameColor) {
-    if (photos.length <= 5) {
-      return Container(
-        color: frameColor,
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: photos.isNotEmpty
-                        ? _buildPhotoCell(photos, 0)
-                        : Container(color: Colors.grey[300]),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: photos.length > 1
-                        ? _buildPhotoCell(photos, 1)
-                        : Container(color: Colors.grey[300]),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              flex: 1,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: photos.length > 2
-                        ? _buildPhotoCell(photos, 2)
-                        : Container(color: Colors.grey[300]),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: photos.length > 3
-                        ? _buildPhotoCell(photos, 3)
-                        : Container(color: Colors.grey[300]),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: photos.length > 4
-                        ? _buildPhotoCell(photos, 4)
-                        : Container(color: Colors.grey[300]),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return _buildAdaptiveGrid(photos, frameColor);
-  }
-
-  Widget _buildFilmLayout(List<XFile> photos, Color frameColor) {
-    return Container(
-      color: Colors.black,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Film strip holes
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(
-              6,
-              (index) => Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: frameColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Photos
-          Expanded(
-            child: _buildAdaptiveGrid(
-              photos,
-              Colors.black,
-              childAspectRatio: 0.9,
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Film strip holes
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(
-              6,
-              (index) => Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: frameColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPolaroidLayout(List<XFile> photos, Color frameColor) {
-    return Container(
-      color: Colors.grey[100],
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
-        padding: EdgeInsets.zero,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _gridColumns(photos.length),
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.8,
-        ),
-        itemCount: photos.length,
-        itemBuilder: (context, index) {
-          return Transform.rotate(
-            angle: (index % 2 == 0) ? -0.05 : 0.05,
-            child: Container(
-              decoration: BoxDecoration(
-                color: frameColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(2, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: _buildPhotoCell(photos, index),
-                  ),
-                  const Expanded(
-                    flex: 1,
-                    child: SizedBox(),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildBubblesLayout(List<XFile> photos, Color frameColor) {
-    if (photos.length <= 5) {
-      return Container(
-        color: Colors.grey[100],
-        child: Stack(
-          children: [
-            if (photos.isNotEmpty)
-              Positioned(
-                top: 20,
-                left: 20,
-                child: _buildCircularPhoto(photos, 0, frameColor, 120),
-              ),
-            if (photos.length > 1)
-              Positioned(
-                top: 40,
-                right: 30,
-                child: _buildCircularPhoto(photos, 1, frameColor, 100),
-              ),
-            if (photos.length > 2)
-              Positioned(
-                bottom: 80,
-                left: 40,
-                child: _buildCircularPhoto(photos, 2, frameColor, 90),
-              ),
-            if (photos.length > 3)
-              Positioned(
-                bottom: 40,
-                right: 40,
-                child: _buildCircularPhoto(photos, 3, frameColor, 110),
-              ),
-            if (photos.length > 4)
-              Positioned(
-                top: 150,
-                left: 150,
-                child: _buildCircularPhoto(photos, 4, frameColor, 80),
-              ),
-          ],
-        ),
-      );
-    }
-
-    return _buildAdaptiveGrid(photos, Colors.grey[100] ?? Colors.white);
-  }
-
-  Widget _buildCircularPhoto(List<XFile> photos, int index, Color frameColor, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: frameColor, width: 4),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(2, 4),
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: WebCompatibleImage(
-          imageFile: photos[index],
-          fit: BoxFit.cover,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPhotoCell(List<XFile> photos, int index) {
-    if (index >= photos.length) {
-      return Container(color: Colors.grey[800]);
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: WebCompatibleImage(
-        imageFile: photos[index],
-        fit: BoxFit.cover,
       ),
     );
   }
 
   Widget _buildSocialButton(
-    BuildContext context,
     String label,
     IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
+    Color color, {
+    bool isGradient = false,
+    Color? iconColor,
+    bool hasBorder = false,
+  }) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Sharing to $label...')),
+            );
+          },
+          child: Container(
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: color,
               shape: BoxShape.circle,
+              gradient: isGradient
+                  ? const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFFFCAF45),
+                        Color(0xFFE1306C),
+                        Color(0xFFC13584),
+                      ],
+                    )
+                  : null,
+              color: isGradient ? null : color,
+              border: hasBorder
+                  ? Border.all(
+                      color: Colors.grey.shade700,
+                      width: 2,
+                    )
+                  : null,
               boxShadow: [
                 BoxShadow(
-                  color: color.withValues(alpha: 0.3),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 8,
-                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Icon(
-              icon,
-              color: color == Colors.yellow || color == Colors.grey
-                  ? Colors.black
-                  : Colors.white,
-              size: 28,
-            ),
+            child: isGradient
+                ? Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF221019),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: iconColor ?? const Color(0xFFE1306C),
+                      size: 24,
+                    ),
+                  )
+                : Icon(
+                    icon,
+                    color: iconColor ?? Colors.white,
+                    size: 24,
+                  ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Colors.grey.shade300,
           ),
-        ],
-      ),
-    );
-  }
-
-  void _shareToInstagram(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sharing to Instagram...')),
-    );
-  }
-
-  void _shareToTikTok(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sharing to TikTok...')),
-    );
-  }
-
-  void _shareToSnapchat(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sharing to Snapchat...')),
-    );
-  }
-
-  void _shareMore(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening share menu...')),
-    );
-  }
-
-  void _shareCollage(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening share options...')),
+        ),
+      ],
     );
   }
 }

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Komjirak App Icon Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            font-family: system-ui;
+        }
+        #canvas {
+            border: 2px solid #333;
+            border-radius: 12px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #2BEE79;
+            border: none;
+            border-radius: 8px;
+            color: black;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #26d96d;
+        }
+        .info {
+            color: #999;
+            text-align: center;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="color: white;">Komjirak Frame App Icon</h1>
+    <canvas id="canvas" width="1024" height="1024"></canvas>
+    <button onclick="downloadIcon()">Download Icon (1024x1024)</button>
+    <div class="info">
+        <p>이 아이콘을 다운로드한 후 <strong>appicon.co</strong>에 업로드하면<br>
+        모든 iOS 사이즈의 아이콘이 자동으로 생성됩니다.</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Draw icon
+        function drawIcon() {
+            const size = 1024;
+            const center = size / 2;
+            
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#1A2E22');
+            gradient.addColorStop(1, '#102217');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Glow effect
+            ctx.shadowColor = 'rgba(43, 238, 121, 0.4)';
+            ctx.shadowBlur = 80;
+            
+            // Main icon container (rounded rect)
+            const containerSize = size * 0.6;
+            const containerX = (size - containerSize) / 2;
+            const containerY = (size - containerSize) / 2;
+            const cornerRadius = 80;
+            
+            ctx.fillStyle = '#1A2E22';
+            ctx.beginPath();
+            ctx.roundRect(containerX, containerY, containerSize, containerSize, cornerRadius);
+            ctx.fill();
+            
+            // Reset shadow for icon
+            ctx.shadowBlur = 0;
+            
+            // Dashboard/Grid icon
+            ctx.fillStyle = '#2BEE79';
+            const iconSize = containerSize * 0.55;
+            const iconX = center - iconSize / 2;
+            const iconY = center - iconSize / 2;
+            
+            // Draw 4 squares in a grid
+            const squareSize = iconSize * 0.4;
+            const gap = iconSize * 0.2;
+            
+            // Top-left square
+            ctx.beginPath();
+            ctx.roundRect(iconX, iconY, squareSize, squareSize, 20);
+            ctx.fill();
+            
+            // Top-right square
+            ctx.beginPath();
+            ctx.roundRect(iconX + squareSize + gap, iconY, squareSize, squareSize, 20);
+            ctx.fill();
+            
+            // Bottom-left square
+            ctx.beginPath();
+            ctx.roundRect(iconX, iconY + squareSize + gap, squareSize, squareSize, 20);
+            ctx.fill();
+            
+            // Bottom-right square
+            ctx.beginPath();
+            ctx.roundRect(iconX + squareSize + gap, iconY + squareSize + gap, squareSize, squareSize, 20);
+            ctx.fill();
+            
+            // Sparkle badge
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = '#ffffff';
+            const badgeSize = 160;
+            const badgeX = containerX + containerSize - badgeSize / 2;
+            const badgeY = containerY - badgeSize / 2;
+            
+            ctx.beginPath();
+            ctx.arc(badgeX, badgeY, badgeSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Sparkle icon
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 80px system-ui';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✨', badgeX, badgeY);
+        }
+        
+        function downloadIcon() {
+            const link = document.createElement('a');
+            link.download = 'komjirak-app-icon-1024.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        drawIcon();
+    </script>
+</body>
+</html>

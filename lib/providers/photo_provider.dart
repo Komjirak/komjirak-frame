@@ -51,4 +51,23 @@ class PhotoProvider with ChangeNotifier {
     _selectedPhotos.addAll(photos.take(maxPhotos));
     notifyListeners();
   }
+
+  // Swap two photos by their indices
+  void swapPhotos(int index1, int index2) {
+    if (index1 >= 0 && index1 < _selectedPhotos.length &&
+        index2 >= 0 && index2 < _selectedPhotos.length) {
+      final temp = _selectedPhotos[index1];
+      _selectedPhotos[index1] = _selectedPhotos[index2];
+      _selectedPhotos[index2] = temp;
+      notifyListeners();
+    }
+  }
+
+  // Replace a photo at a specific index with a new photo
+  Future<void> replacePhoto(int index, String newPhotoPath) async {
+    if (index >= 0 && index < _selectedPhotos.length) {
+      _selectedPhotos[index] = newPhotoPath;
+      notifyListeners();
+    }
+  }
 }
