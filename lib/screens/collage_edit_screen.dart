@@ -1,6 +1,3 @@
-  void _showQualityDialogAndSave() {
-    // TODO: Implement actual dialog and save logic
-  }
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -25,16 +22,38 @@ class CollageEditScreen extends StatefulWidget {
 
   @override
   State<CollageEditScreen> createState() => _CollageEditScreenState();
-    String _titlePosition = 'top'; // or 'bottom'
-    final GlobalKey _repaintKey = GlobalKey();
-    List<TextElement> _textElements = [];
-    Color _textBackgroundColor = Colors.transparent;
-    Color _textColor = Colors.white;
-    double _frameSpacing = 8.0;
-    double _cornerRadius = 12.0;
-    Color _selectedFrameColor = Colors.white;
-    final int _maxTextElements = 3;
+}
+
+class _CollageEditScreenState extends State<CollageEditScreen> {
+    @override
+    void initState() {
+      super.initState();
+      _collageTextController = TextEditingController(text: _collageText);
+      // 이미지가 있으면 PhotoProvider에 동기화
+      if (widget.photos != null && widget.photos!.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
+          photoProvider.setPhotos(widget.photos!.map((x) => x.path).toList());
+        });
+        final photoCount = widget.photos!.length;
+        final matchingTemplates = FrameTemplates.getTemplatesForPhotoCount(photoCount);
+        _selectedLayout = matchingTemplates.isNotEmpty
+            ? matchingTemplates.first
+            : FrameTemplates.getAllTemplates().first;
+      } else {
+        _selectedLayout = FrameTemplates.getAllTemplates().first;
+      }
+    }
   // State fields
+  String _titlePosition = 'top'; // or 'bottom'
+  final GlobalKey _repaintKey = GlobalKey();
+  List<TextElement> _textElements = [];
+  Color _textBackgroundColor = Colors.transparent;
+  Color _textColor = Colors.white;
+  double _frameSpacing = 8.0;
+  double _cornerRadius = 12.0;
+  Color _selectedFrameColor = Colors.white;
+  final int _maxTextElements = 3;
   bool _isMagazineMode = false;
   CollageLayout? _selectedLayout;
   MagazineLayout? _magazineLayout;
@@ -43,6 +62,8 @@ class CollageEditScreen extends StatefulWidget {
   bool _hasMagazinePresetApplied = false;
   bool _titleMode = false;
   String _collageText = '';
+  late TextEditingController _collageTextController;
+
   String _selectedFont = 'Roboto';
   Color _selectedTextColor = Colors.white;
   double _textSize = 24.0;
@@ -50,8 +71,9 @@ class CollageEditScreen extends StatefulWidget {
   bool _isDraggingText = false;
   Offset? _dragStartOffset;
   Offset? _textStartOffset;
-  // Add any other fields as needed for your logic
-  // (misplaced widget code removed)
+  double _aspectRatio = 0.8; // 기본값 4:5
+  TextElement? _selectedTextElement;
+
   final List<String> _availableFonts = [
     'Roboto',              // 기본 산세리프
     'Noto Serif KR',       // 한글 명조체 (서제 느낌)
@@ -76,34 +98,42 @@ class CollageEditScreen extends StatefulWidget {
     Colors.orange,
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    // Select first layout matching the photo count by default (only for regular collage mode)
-    if (widget.photos != null) {
-      final photoCount = widget.photos!.length;
-      final matchingTemplates = FrameTemplates.getTemplatesForPhotoCount(photoCount);
-      _selectedLayout = matchingTemplates.isNotEmpty 
-          ? matchingTemplates.first 
-          : FrameTemplates.getAllTemplates().first;
-    } else {
-      // Magazine mode - layout will be set in didChangeDependencies
-      _selectedLayout = FrameTemplates.getAllTemplates().first;
-    }
+  void _showQualityDialogAndSave() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2a1520),
+          title: const Text('이미지 저장', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildQualityOption(context, '고화질', '최대 해상도', 3.0),
+              const SizedBox(height: 8),
+              _buildQualityOption(context, '일반화질', '권장 해상도', 2.0),
+              const SizedBox(height: 8),
+              _buildQualityOption(context, '저화질', '빠른 저장', 1.0),
+            ],
+          ),
+        );
+      },
+    ).then((pixelRatio) {
+      if (pixelRatio is double) {
+        _saveToGallery(pixelRatio);
+      }
+    });
   }
+
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
     // Load arguments only once
     if (!_hasLoadedArguments) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      
       // Check for magazine layout
       final magazineLayout = args?['magazineLayout'] as MagazineLayout?;
       final project = args?['project'] as Project?;
-      
       if (magazineLayout != null && project != null) {
         setState(() {
           _magazineLayout = magazineLayout;
@@ -119,14 +149,12 @@ class CollageEditScreen extends StatefulWidget {
       } else {
         // Regular collage mode
         final preselectedLayout = args?['preselectedLayout'] as CollageLayout?;
-        
         if (preselectedLayout != null) {
           setState(() {
             _selectedLayout = preselectedLayout;
           });
         }
       }
-      
       _hasLoadedArguments = true;
     }
   }
@@ -229,6 +257,14 @@ class CollageEditScreen extends StatefulWidget {
   }
 
   Widget _buildCanvasArea(List<String> imagePaths) {
+    if (_selectedLayout == null) {
+      return Center(
+        child: Text(
+          '레이아웃 정보를 불러올 수 없습니다.',
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
+      );
+    }
     // Magazine mode rendering
     if (_isMagazineMode && _magazineLayout != null && _project != null) {
       const magazineFrameSpacing = 8.0; // Minimal spacing for magazine style
@@ -353,7 +389,7 @@ class CollageEditScreen extends StatefulWidget {
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                         decoration: BoxDecoration(
-                                          color: textElement.backgroundColor,
+                                          color: _textBackgroundColor,
                                           borderRadius: BorderRadius.circular(8),
                                           border: textElement.isSelected
                                               ? Border.all(color: Theme.of(context).primaryColor, width: 2)
@@ -362,10 +398,10 @@ class CollageEditScreen extends StatefulWidget {
                                         child: Text(
                                           textElement.text,
                                           style: GoogleFonts.getFont(
-                                            textElement.fontFamily,
-                                            fontSize: textElement.size,
+                                            _selectedFont,
+                                            fontSize: _textSize,
                                             fontWeight: FontWeight.w700,
-                                            color: textElement.textColor,
+                                            color: _selectedTextColor,
                                             height: 1.2,
                                           ),
                                         ),
@@ -399,7 +435,7 @@ class CollageEditScreen extends StatefulWidget {
                                             _selectedFont,
                                             fontSize: _textSize,
                                             fontWeight: FontWeight.w700,
-                                            color: _textColor,
+                                            color: _selectedTextColor,
                                             height: 1.2,
                                           ),
                                         ),
@@ -458,7 +494,7 @@ class CollageEditScreen extends StatefulWidget {
                     RepaintBoundary(
                   key: _repaintKey,
                   child: CollageCanvas(
-                    layout: _selectedLayout,
+                    layout: _selectedLayout!,
                     imagePaths: imagePaths,
                     frameColor: _selectedFrameColor,
                     overlayText: _titleMode ? null : (_collageText.isEmpty && _textElements.isEmpty ? null : _collageText),
@@ -577,41 +613,51 @@ class CollageEditScreen extends StatefulWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Draggable handle
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 8, bottom: 4),
-                width: 48,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SizedBox(
+              height: constraints.maxHeight,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Draggable handle
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 8, bottom: 4),
+                        width: 48,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    // Tool tabs
+                    _buildToolTabs(),
+                    // Expanded content
+                    if (isExpanded) ...[
+                      // Divider
+                      Container(
+                        height: 1,
+                        color: Colors.white.withValues(alpha: 0.05),
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                      ),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: constraints.maxHeight * 0.5,
+                        ),
+                        child: _buildContextualControls(),
+                      ),
+                      const SizedBox(height: 8),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
               ),
-            ),
-            // Tool tabs
-            _buildToolTabs(),
-            // Expanded content
-            if (isExpanded) ...[
-              // Divider
-              Container(
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.05),
-                margin: const EdgeInsets.symmetric(vertical: 6),
-              ),
-              // Contextual controls with reduced height (40% smaller)
-              SizedBox(
-                height: 108,
-                child: _buildContextualControls(),
-              ),
-              const SizedBox(height: 8),
-            ] else ...[
-              const SizedBox(height: 8),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
@@ -696,6 +742,8 @@ class CollageEditScreen extends StatefulWidget {
 
   Widget _buildContextualControls() {
     switch (_selectedToolIndex) {
+      case 0:
+        return _buildLayoutControls();
       case 1:
         return _buildRatioControls();
       case 2:
@@ -823,7 +871,7 @@ class CollageEditScreen extends StatefulWidget {
                 // Templates
                 ...availableTemplates.asMap().entries.map((entry) {
                   final template = entry.value;
-                  final isSelected = _selectedLayout.id == template.id;
+                  final isSelected = _selectedLayout?.id == template.id;
                   final isNew = entry.key == 0;
                   
                   return Padding(
@@ -1188,39 +1236,162 @@ class CollageEditScreen extends StatefulWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with Add Text button
+            // Title On/Off 스위치
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Text Elements',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
+                const Text('Title On/Off', style: TextStyle(color: Colors.white70)),
+                Switch(
+                  value: _titleMode,
+                  onChanged: (value) {
+                    setState(() {
+                      _titleMode = value;
+                    });
+                  },
+                  activeColor: Theme.of(context).primaryColor,
                 ),
-                Row(
-                  children: [
-                    const Text(
-                      'Title Mode',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Switch(
-                      value: _titleMode,
-                      onChanged: (value) {
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 텍스트 입력창 (타이틀/중간 텍스트 모두)
+            Focus(
+              onFocusChange: (hasFocus) {
+                if (!hasFocus) {
+                  setState(() {
+                    _collageText = _collageTextController.text;
+                  });
+                }
+              },
+              child: TextField(
+                decoration: InputDecoration(
+                  labelText: _titleMode ? '타이틀 텍스트 입력' : '텍스트 입력',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  fillColor: Colors.white10,
+                  filled: true,
+                ),
+                style: GoogleFonts.getFont(
+                  _selectedFont,
+                  color: _selectedTextColor,
+                  fontSize: _textSize,
+                ),
+                controller: _collageTextController,
+                textInputAction: TextInputAction.done,
+                keyboardType: TextInputType.text,
+                onChanged: (value) {
+                  setState(() {
+                    _collageText = value;
+                  });
+                },
+                onEditingComplete: () {
+                  setState(() {
+                    _collageText = _collageTextController.text;
+                  });
+                },
+                enableIMEPersonalizedLearning: true,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 폰트 선택
+            Row(
+              children: [
+                const Text('Font:', style: TextStyle(color: Colors.white70)),
+                const SizedBox(width: 8),
+                DropdownButton<String>(
+                  value: _selectedFont,
+                  dropdownColor: const Color(0xFF2a1520),
+                  items: _availableFonts.map((font) {
+                    return DropdownMenuItem<String>(
+                      value: font,
+                      child: Text(font, style: TextStyle(color: Colors.white)),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedFont = value;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 배경 색상 선택
+            Row(
+              children: [
+                const Text('Background:', style: TextStyle(color: Colors.white70)),
+                const SizedBox(width: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _availableTextColors.map((color) {
+                    return GestureDetector(
+                      onTap: () {
                         setState(() {
-                          _titleMode = value;
+                          _textBackgroundColor = color;
                         });
                       },
-                      activeColor: Theme.of(context).primaryColor,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: color,
+                          border: Border.all(
+                            color: _textBackgroundColor == color ? Theme.of(context).primaryColor : Colors.white24,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 폰트 색상 선택
+            Row(
+              children: [
+                const Text('Font Color:', style: TextStyle(color: Colors.white70)),
+                const SizedBox(width: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _availableTextColors.map((color) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedTextColor = color;
+                        });
+                      },
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: color,
+                          border: Border.all(
+                            color: _selectedTextColor == color ? Theme.of(context).primaryColor : Colors.white24,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildQualityOption(BuildContext context, String title, String subtitle, double pixelRatio) {
     return InkWell(
@@ -1535,28 +1706,70 @@ class CollageEditScreen extends StatefulWidget {
   }
 
   Widget _buildExternalTitle() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-      color: const Color(0xFF1a0d15),
-      child: Center(
-        child: Text(
-          _collageText,
-          style: _getTitleTextStyle(),
-          textAlign: TextAlign.center,
+    return GestureDetector(
+      onPanUpdate: (details) {
+        setState(() {
+          if (_titlePosition == 'top' || _titlePosition == 'bottom') {
+            // Allow dragging to switch between top/bottom/external
+            if (details.delta.dy < -10) {
+              _titlePosition = 'top';
+            } else if (details.delta.dy > 10) {
+              _titlePosition = 'bottom';
+            } else {
+              _titlePosition = 'external';
+            }
+          }
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+        color: const Color(0xFF1a0d15),
+        child: Center(
+          child: Text(
+            _collageText,
+            style: GoogleFonts.getFont(
+              _selectedFont,
+              color: _selectedTextColor,
+              fontSize: _textSize * 1.5,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMagazineTitle() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-      color: const Color(0xFFFAFAFA),
-      child: Center(
-        child: Text(
-          _collageText,
-          style: _getMagazineTitleTextStyle(),
-          textAlign: TextAlign.center,
+    return GestureDetector(
+      onPanUpdate: (details) {
+        setState(() {
+          if (_titlePosition == 'top' || _titlePosition == 'bottom') {
+            if (details.delta.dy < -10) {
+              _titlePosition = 'top';
+            } else if (details.delta.dy > 10) {
+              _titlePosition = 'bottom';
+            } else {
+              _titlePosition = 'external';
+            }
+          }
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+        color: const Color(0xFFFAFAFA),
+        child: Center(
+          child: Text(
+            _collageText,
+            style: GoogleFonts.getFont(
+              _selectedFont,
+              color: _selectedTextColor,
+              fontSize: _textSize * 1.8,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ),
       ),
     );

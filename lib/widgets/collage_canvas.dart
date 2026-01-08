@@ -127,16 +127,18 @@ class _CollageCanvasState extends State<CollageCanvas> {
       height = cell.customHeight! * constraints.maxHeight;
     } else {
       // Calculate max grid columns dynamically (3 or 4 columns)
-      final maxColumns = _editableCells.fold<int>(
+      double maxColumns = _editableCells.fold<int>(
         0,
         (max, cell) => (cell.column + cell.columnSpan) > max ? (cell.column + cell.columnSpan) : max,
       ).clamp(3, 4).toDouble();
+      if (maxColumns == 0) maxColumns = 1.0;
 
       // Calculate max grid rows dynamically (3 or 4 rows)
-      final maxRows = _editableCells.fold<int>(
+      double maxRows = _editableCells.fold<int>(
         0,
         (max, cell) => (cell.row + cell.rowSpan) > max ? (cell.row + cell.rowSpan) : max,
       ).clamp(3, 4).toDouble();
+      if (maxRows == 0) maxRows = 1.0;
 
       left = (cell.column / maxColumns) * constraints.maxWidth;
       top = (cell.row / maxRows) * constraints.maxHeight;
@@ -271,7 +273,9 @@ class _CollageCanvasState extends State<CollageCanvas> {
   Widget _buildTextOverlay(BoxConstraints constraints, [TextElement? textElement, String? legacyText]) {
     // Use TextElement if provided, otherwise use legacy single text
     final text = textElement?.text ?? legacyText ?? '';
-    final position = textElement?.position ?? widget.textPosition ?? Offset(constraints.maxWidth / 2, constraints.maxHeight - 60);
+    final safeMaxWidth = constraints.maxWidth > 0 ? constraints.maxWidth : 1.0;
+    final safeMaxHeight = constraints.maxHeight > 0 ? constraints.maxHeight : 1.0;
+    final position = textElement?.position ?? widget.textPosition ?? Offset(safeMaxWidth / 2, safeMaxHeight - 60);
     final textSize = textElement?.size ?? widget.textSize ?? 18.0;
     final fontFamily = textElement?.fontFamily ?? widget.fontFamily;
     final textColor = textElement?.textColor ?? widget.textColor ?? Colors.white;
@@ -281,6 +285,8 @@ class _CollageCanvasState extends State<CollageCanvas> {
     
     if (text.isEmpty) return const SizedBox.shrink();
     
+    final clampMaxWidth = (safeMaxWidth - 200) > 0 ? (safeMaxWidth - 200) : 1.0;
+    final clampMaxHeight = (safeMaxHeight - 100) > 0 ? (safeMaxHeight - 100) : 1.0;
     return Positioned(
       left: 0,
       top: 0,
@@ -289,8 +295,8 @@ class _CollageCanvasState extends State<CollageCanvas> {
       child: Stack(
         children: [
           Positioned(
-            left: position.dx.clamp(0.0, constraints.maxWidth - 200),
-            top: position.dy.clamp(0.0, constraints.maxHeight - 100),
+            left: position.dx.clamp(0.0, clampMaxWidth),
+            top: position.dy.clamp(0.0, clampMaxHeight),
             child: GestureDetector(
               onTap: () {
                 if (textId != null && widget.onTextTapped != null) {
@@ -312,8 +318,8 @@ class _CollageCanvasState extends State<CollageCanvas> {
                       widget.onTextPositionChanged!(
                         null,
                         Offset(
-                          (position.dx + details.focalPointDelta.dx).clamp(0, constraints.maxWidth - 200),
-                          (position.dy + details.focalPointDelta.dy).clamp(0, constraints.maxHeight - 100),
+                          (position.dx + details.focalPointDelta.dx).clamp(0, clampMaxWidth),
+                          (position.dy + details.focalPointDelta.dy).clamp(0, clampMaxHeight),
                         ),
                       );
                     }
