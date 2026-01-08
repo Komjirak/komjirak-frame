@@ -7,6 +7,9 @@ import 'screens/photo_selection_screen.dart';
 import 'screens/collage_edit_screen.dart';
 import 'screens/preview_screen.dart';
 import 'screens/export_screen.dart';
+import 'screens/magazine_selection_screen.dart';
+import 'screens/magazine_photo_fill_screen.dart';
+import 'screens/custom_canvas_screen.dart';
 import 'providers/photo_provider.dart';
 import 'providers/project_provider.dart';
 import 'core/theme/app_theme.dart';
@@ -38,6 +41,9 @@ class KomjirakFrameApp extends StatelessWidget {
           '/': (context) => const SplashScreen(),
           '/home': (context) => const HomeScreen(),
           '/photo-selection': (context) => const PhotoSelectionScreen(),
+          '/magazine-selection': (context) => const MagazineSelectionScreen(),
+          '/magazine-photo-fill': (context) => const MagazinePhotoFillScreen(),
+          '/custom-canvas': (context) => const CustomCanvasScreen(),
           '/preview': (context) => const PreviewScreen(),
           '/export': (context) => const ExportScreen(),
         },
@@ -45,9 +51,10 @@ class KomjirakFrameApp extends StatelessWidget {
         onGenerateRoute: (settings) {
           if (settings.name == '/collage-edit') {
             final args = settings.arguments as Map<String, dynamic>?;
-            final photos = args?['photos'] as List<XFile>? ?? [];
+            final photos = args?['photos'] as List<XFile>?;
             return MaterialPageRoute(
               builder: (context) => CollageEditScreen(photos: photos),
+              settings: settings, // Pass settings to preserve arguments
             );
           }
           return null;

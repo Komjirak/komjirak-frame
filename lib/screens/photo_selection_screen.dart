@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../widgets/web_image.dart';
 import '../models/collage_layout.dart';
+import '../providers/photo_provider.dart';
 
 class PhotoSelectionScreen extends StatefulWidget {
   const PhotoSelectionScreen({super.key});
@@ -13,7 +15,7 @@ class PhotoSelectionScreen extends StatefulWidget {
 class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
   final List<XFile> _selectedPhotos = [];
   final ImagePicker _picker = ImagePicker();
-  static const int _maxPhotos = 10;
+  static const int _maxPhotos = 12;
   CollageLayout? _preselectedLayout;
   bool _hasLoadedArguments = false;
 
@@ -124,6 +126,10 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
       );
       return;
     }
+
+    // Provider에 선택된 사진 동기화
+    final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
+    photoProvider.setPhotos(_selectedPhotos.map((x) => x.path).toList());
 
     Navigator.pushNamed(
       context,
@@ -724,25 +730,25 @@ class _PhotoSelectionScreenState extends State<PhotoSelectionScreen> {
   }
 
   Widget _buildEmptySlot(int number) {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 2,
-          strokeAlign: BorderSide.strokeAlignInside,
+    return GestureDetector(
+      onTap: _showImageSourceDialog,
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+            width: 2,
+            strokeAlign: BorderSide.strokeAlignInside,
+          ),
+          color: Colors.transparent,
         ),
-        color: Colors.transparent,
-      ),
-      child: Center(
-        child: Text(
-          '$number',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Colors.white.withValues(alpha: 0.2),
+        child: Center(
+          child: Icon(
+            Icons.add,
+            size: 24,
+            color: Colors.white.withValues(alpha: 0.3),
           ),
         ),
       ),

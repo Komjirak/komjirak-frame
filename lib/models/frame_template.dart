@@ -686,11 +686,11 @@ class FrameTemplates {
         FrameCell(row: 0, column: 0, rowSpan: 1, columnSpan: 1),
         FrameCell(row: 0, column: 1, rowSpan: 1, columnSpan: 1),
         FrameCell(row: 0, column: 2, rowSpan: 1, columnSpan: 1),
+        FrameCell(row: 0, column: 3, rowSpan: 1, columnSpan: 1),
         FrameCell(row: 1, column: 0, rowSpan: 1, columnSpan: 1),
         FrameCell(row: 1, column: 1, rowSpan: 1, columnSpan: 1),
         FrameCell(row: 1, column: 2, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 2, column: 0, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 2, column: 1, rowSpan: 1, columnSpan: 2),
+        FrameCell(row: 1, column: 3, rowSpan: 1, columnSpan: 1),
       ],
     );
   }
@@ -704,14 +704,14 @@ class FrameTemplates {
       minPhotos: 8,
       maxPhotos: 8,
       cells: [
-        FrameCell(row: 0, column: 0, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 0, column: 1, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 1, column: 0, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 1, column: 1, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 2, column: 0, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 2, column: 1, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 3, column: 0, rowSpan: 1, columnSpan: 1),
-        FrameCell(row: 3, column: 1, rowSpan: 1, columnSpan: 1),
+        FrameCell(row: 0, column: 0, rowSpan: 2, columnSpan: 1),
+        FrameCell(row: 0, column: 1, rowSpan: 2, columnSpan: 1),
+        FrameCell(row: 0, column: 2, rowSpan: 2, columnSpan: 1),
+        FrameCell(row: 0, column: 3, rowSpan: 2, columnSpan: 1),
+        FrameCell(row: 2, column: 0, rowSpan: 2, columnSpan: 1),
+        FrameCell(row: 2, column: 1, rowSpan: 2, columnSpan: 1),
+        FrameCell(row: 2, column: 2, rowSpan: 2, columnSpan: 1),
+        FrameCell(row: 2, column: 3, rowSpan: 2, columnSpan: 1),
       ],
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 class PhotoProvider with ChangeNotifier {
   final List<String> _selectedPhotos = [];
-  final int maxPhotos = 10;
+  final int maxPhotos = 12;
 
   List<String> get selectedPhotos => List.unmodifiable(_selectedPhotos);
   int get photoCount => _selectedPhotos.length;
