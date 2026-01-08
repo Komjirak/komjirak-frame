@@ -1,6 +1,3 @@
-  void _showQualityDialogAndSave() {
-    // TODO: Implement actual dialog and save logic
-  }
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -25,15 +22,20 @@ class CollageEditScreen extends StatefulWidget {
 
   @override
   State<CollageEditScreen> createState() => _CollageEditScreenState();
-    String _titlePosition = 'top'; // or 'bottom'
-    final GlobalKey _repaintKey = GlobalKey();
-    List<TextElement> _textElements = [];
-    Color _textBackgroundColor = Colors.transparent;
-    Color _textColor = Colors.white;
-    double _frameSpacing = 8.0;
-    double _cornerRadius = 12.0;
-    Color _selectedFrameColor = Colors.white;
-    final int _maxTextElements = 3;
+}
+
+class _CollageEditScreenState extends State<CollageEditScreen> {
+  String _titlePosition = 'top'; // or 'bottom'
+  final GlobalKey _repaintKey = GlobalKey();
+  List<TextElement> _textElements = [];
+  TextElement? _selectedTextElement;
+  Color _textBackgroundColor = Colors.transparent;
+  Color _textColor = Colors.white;
+  double _frameSpacing = 8.0;
+  double _cornerRadius = 12.0;
+  double _aspectRatio = 0.8;
+  Color _selectedFrameColor = Colors.white;
+  final int _maxTextElements = 3;
   // State fields
   bool _isMagazineMode = false;
   CollageLayout? _selectedLayout;
@@ -1201,26 +1203,219 @@ class CollageEditScreen extends StatefulWidget {
                     letterSpacing: 0.5,
                   ),
                 ),
-                Row(
-                  children: [
-                    const Text(
-                      'Title Mode',
+                IconButton(
+                  onPressed: _titleMode || _textElements.length >= _maxTextElements
+                      ? null
+                      : _addTextElement,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  tooltip: 'Add Text',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Text(
+                  'Title Mode',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Switch(
+                  value: _titleMode,
+                  onChanged: (value) {
+                    setState(() {
+                      _titleMode = value;
+                    });
+                  },
+                  activeColor: Theme.of(context).primaryColor,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (!_titleMode && _textElements.isNotEmpty) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _textElements.map((element) {
+                  final isSelected = _selectedTextElement?.id == element.id;
+                  return InputChip(
+                    label: Text(
+                      element.text,
                       style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white70,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Switch(
-                      value: _titleMode,
-                      onChanged: (value) {
-                        setState(() {
-                          _titleMode = value;
-                        });
-                      },
-                      activeColor: Theme.of(context).primaryColor,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    selected: isSelected,
+                    onSelected: (_) => _selectTextElement(element),
+                    onDeleted: () => _deleteTextElement(element.id),
+                    selectedColor: Theme.of(context).primaryColor,
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    deleteIconColor: Colors.white70,
+                    checkmarkColor: Colors.white,
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (!_titleMode) ...[
+                  const Text(
+                    'Font',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedFont,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.05),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      ),
+                    ),
+                    dropdownColor: const Color(0xFF2a1520),
+                    items: _availableFonts.map((font) {
+                      return DropdownMenuItem(
+                        value: font,
+                        child: Text(
+                          _getFontDisplayName(font),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _selectedFont = value;
+                      });
+                      _updateSelectedTextElement(fontFamily: value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Size',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  Slider(
+                    value: _textSize,
+                    min: 12,
+                    max: 60,
+                    onChanged: (value) {
+                      setState(() {
+                        _textSize = value;
+                      });
+                      _updateSelectedTextElement(size: value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Text Color',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _availableTextColors.map((color) {
+                      final isSelected = _textColor == color;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _textColor = color;
+                          });
+                          _updateSelectedTextElement(textColor: color);
+                        },
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: isSelected
+                                ? Border.all(color: Colors.white, width: 2)
+                                : Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Background',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _buildBackgroundSwatch(Colors.transparent),
+                      ..._availableTextColors.map(_buildBackgroundSwatch),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBackgroundSwatch(Color color) {
+    final isSelected = _textBackgroundColor == color;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _textBackgroundColor = color;
+        });
+        _updateSelectedTextElement(backgroundColor: color);
+      },
+      child: Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: color == Colors.transparent ? Colors.white.withValues(alpha: 0.05) : color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.2),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: color == Colors.transparent
+            ? const Icon(Icons.clear, size: 14, color: Colors.white70)
+            : null,
+      ),
+    );
+  }
+
+  void _showQualityDialogAndSave() {
+    // TODO: Implement actual dialog and save logic
+  }
 
   Widget _buildQualityOption(BuildContext context, String title, String subtitle, double pixelRatio) {
     return InkWell(
