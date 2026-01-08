@@ -1,3 +1,6 @@
+  void _showQualityDialogAndSave() {
+    // TODO: Implement actual dialog and save logic
+  }
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -18,42 +21,37 @@ import '../services/storage_service.dart';
 class CollageEditScreen extends StatefulWidget {
   final List<XFile>? photos;
 
-  const CollageEditScreen({
-    super.key,
-    this.photos,
-  });
+  const CollageEditScreen({Key? key, this.photos}) : super(key: key);
 
   @override
   State<CollageEditScreen> createState() => _CollageEditScreenState();
-}
-
-class _CollageEditScreenState extends State<CollageEditScreen> {
-  late CollageLayout _selectedLayout;
+    String _titlePosition = 'top'; // or 'bottom'
+    final GlobalKey _repaintKey = GlobalKey();
+    List<TextElement> _textElements = [];
+    Color _textBackgroundColor = Colors.transparent;
+    Color _textColor = Colors.white;
+    double _frameSpacing = 8.0;
+    double _cornerRadius = 12.0;
+    Color _selectedFrameColor = Colors.white;
+    final int _maxTextElements = 3;
+  // State fields
+  bool _isMagazineMode = false;
+  CollageLayout? _selectedLayout;
   MagazineLayout? _magazineLayout;
   Project? _project;
-  bool _isMagazineMode = false;
-  Color _selectedFrameColor = Colors.white;
-  String _collageText = '';  // Legacy: for title mode
-  String _selectedFont = 'Roboto';  // Default font
-  Color _textColor = Colors.white;
-  Color _textBackgroundColor = Colors.black.withValues(alpha: 0.6);
-  double _textSize = 18.0;
-  double _frameSpacing = 2.0;
-  double _cornerRadius = 0.0;  // Default to square (no rounding)
-  double _aspectRatio = 4 / 5;
-  Offset _textPosition = const Offset(200, 400);
-  bool _titleMode = false;  // Toggle between overlay and external title
-  String _titlePosition = 'top';  // 'top' or 'bottom'
-  bool _editMode = false;  // Toggle frame editing mode
   bool _hasLoadedArguments = false;
-  bool _hasMagazinePresetApplied = false;  // Track if magazine preset has been applied
-  final GlobalKey _repaintKey = GlobalKey();
-  
-  // Multiple text elements support (max 10)
-  final List<TextElement> _textElements = [];
-  TextElement? _selectedTextElement;
-  static const int _maxTextElements = 10;
-
+  bool _hasMagazinePresetApplied = false;
+  bool _titleMode = false;
+  String _collageText = '';
+  String _selectedFont = 'Roboto';
+  Color _selectedTextColor = Colors.white;
+  double _textSize = 24.0;
+  Offset _textPosition = const Offset(100, 100);
+  bool _isDraggingText = false;
+  Offset? _dragStartOffset;
+  Offset? _textStartOffset;
+  // Add any other fields as needed for your logic
+  // (misplaced widget code removed)
   final List<String> _availableFonts = [
     'Roboto',              // 기본 산세리프
     'Noto Serif KR',       // 한글 명조체 (서제 느낌)
@@ -148,14 +146,12 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
             children: [
               // Top App Bar
               _buildAppBar(context),
-              
               // Main Canvas Area - Expand to fill available space
               Expanded(
                 child: Center(
                   child: _buildCanvasArea(imagePaths),
                 ),
               ),
-              
               // Bottom Controls Section - Fixed height
               _buildControlsSection(),
             ],
@@ -699,13 +695,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 
   Widget _buildContextualControls() {
-    if (_selectedToolIndex == null) {
-      return const SizedBox.shrink();
-    }
-    
-    switch (_selectedToolIndex!) {
-      case 0:
-        return _buildLayoutControls();
+    switch (_selectedToolIndex) {
       case 1:
         return _buildRatioControls();
       case 2:
@@ -1231,527 +1221,6 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                       },
                       activeColor: Theme.of(context).primaryColor,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            
-            // Title Mode Text Input (for external title)
-            if (_titleMode) ...[
-              TextField(
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Enter title text...',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14),
-                  filled: true,
-                  fillColor: const Color(0xFF2a1520),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _collageText = value;
-                  });
-                },
-              ),
-            if (_titleMode) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _titlePosition = 'top';
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _titlePosition == 'top'
-                              ? Theme.of(context).primaryColor
-                              : Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'Top',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _titlePosition = 'bottom';
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _titlePosition == 'bottom'
-                              ? Theme.of(context).primaryColor
-                              : Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'Bottom',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            
-            // Overlay Text Elements (when not in title mode)
-            if (!_titleMode) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Text Elements (${_textElements.length}/$_maxTextElements)',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                  if (_textElements.length < _maxTextElements)
-                    GestureDetector(
-                      onTap: _addTextElement,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.add, color: Colors.white, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              'Add',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              
-              // Text Elements List
-              if (_textElements.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '텍스트를 추가하려면 + 버튼을 누르세요',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                )
-              else
-                ..._textElements.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final textElement = entry.value;
-                  final isSelected = _selectedTextElement?.id == textElement.id;
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor.withValues(alpha: 0.2)
-                          : Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isSelected
-                            ? Theme.of(context).primaryColor
-                            : Colors.white.withValues(alpha: 0.1),
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                                decoration: InputDecoration(
-                                  hintText: '텍스트 입력...',
-                                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-                                  filled: false,
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                controller: TextEditingController(text: textElement.text)
-                                  ..selection = TextSelection.collapsed(offset: textElement.text.length),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _textElements[index] = textElement.copyWith(text: value);
-                                  });
-                                },
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => _deleteTextElement(textElement.id),
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                child: Icon(
-                                  Icons.close,
-                                  color: Colors.white.withValues(alpha: 0.6),
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: () => _selectTextElement(textElement),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? Theme.of(context).primaryColor
-                                      : Colors.white.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '편집',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: textElement.textColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              
-              // Selected Text Element Editor
-              if (_selectedTextElement != null) ...[
-                const SizedBox(height: 16),
-                const Divider(color: Colors.white24),
-                const SizedBox(height: 12),
-                const Text(
-                  'Selected Text Style',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 32,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _availableFonts.length,
-                    itemBuilder: (context, index) {
-                      final font = _availableFonts[index];
-                      final isSelected = _selectedTextElement!.fontFamily == font;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _updateSelectedTextElement(fontFamily: font);
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Theme.of(context).primaryColor
-                                : Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Theme.of(context).primaryColor
-                                  : Colors.white.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _getFontDisplayName(font),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Text Color',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: _availableTextColors.map((color) {
-                              final isSelected = _selectedTextElement!.textColor == color;
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _updateSelectedTextElement(textColor: color);
-                                  });
-                                },
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                    border: isSelected 
-                                        ? Border.all(color: Theme.of(context).primaryColor, width: 2)
-                                        : Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Background',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              ..._availableTextColors.map((color) {
-                                final bgColor = color.withValues(alpha: 0.6);
-                                final isSelected = _selectedTextElement!.backgroundColor == bgColor;
-                                return GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _updateSelectedTextElement(backgroundColor: bgColor);
-                                    });
-                                  },
-                                  child: Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: bgColor,
-                                      shape: BoxShape.circle,
-                                      border: isSelected 
-                                          ? Border.all(color: Theme.of(context).primaryColor, width: 2)
-                                          : Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _updateSelectedTextElement(backgroundColor: Colors.transparent);
-                                  });
-                                },
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.1),
-                                    shape: BoxShape.circle,
-                                    border: _selectedTextElement!.backgroundColor == Colors.transparent
-                                        ? Border.all(color: Theme.of(context).primaryColor, width: 2)
-                                        : Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                                  ),
-                                  child: Icon(
-                                    Icons.block,
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    size: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text(
-                      'Size',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: SliderTheme(
-                        data: SliderThemeData(
-                          trackHeight: 4,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                          activeTrackColor: Theme.of(context).primaryColor,
-                          inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
-                          thumbColor: Colors.white,
-                        ),
-                        child: Slider(
-                          value: _selectedTextElement!.size,
-                          min: 12,
-                          max: 48,
-                          onChanged: (value) {
-                            setState(() {
-                              _updateSelectedTextElement(size: value);
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${_selectedTextElement!.size.toInt()}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showQualityDialogAndSave() async {
-    // Show quality selection dialog
-    final quality = await showDialog<double>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2a1520),
-          title: const Text(
-            'Select Export Quality',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildQualityOption(context, 'High Quality', '3.0x (Best)', 3.0),
-              const SizedBox(height: 12),
-              _buildQualityOption(context, 'Medium Quality', '2.0x (Balanced)', 2.0),
-              const SizedBox(height: 12),
-              _buildQualityOption(context, 'Low Quality', '1.0x (Faster)', 1.0),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey.shade400),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (quality != null) {
-      _saveToGallery(quality);
-    }
-  }
 
   Widget _buildQualityOption(BuildContext context, String title, String subtitle, double pixelRatio) {
     return InkWell(
@@ -2385,7 +1854,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 }
 
-// Custom painter for template preview
+// Custom painter for template preview (클래스 바깥으로 이동)
 class _TemplatePreviewPainter extends CustomPainter {
   final CollageLayout layout;
 
@@ -2427,4 +1896,4 @@ class _TemplatePreviewPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-} 
+}
