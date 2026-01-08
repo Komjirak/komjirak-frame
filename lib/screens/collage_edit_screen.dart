@@ -8,16 +8,19 @@ import 'package:path_provider/path_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/collage_layout.dart';
 import '../models/frame_template.dart';
+import '../models/magazine_layout.dart';
+import '../models/project_model.dart';
+import '../models/text_element.dart';
 import '../widgets/collage_canvas.dart';
 import '../providers/photo_provider.dart';
 import '../services/storage_service.dart';
 
 class CollageEditScreen extends StatefulWidget {
-  final List<XFile> photos;
+  final List<XFile>? photos;
 
   const CollageEditScreen({
     super.key,
-    required this.photos,
+    this.photos,
   });
 
   @override
@@ -26,8 +29,11 @@ class CollageEditScreen extends StatefulWidget {
 
 class _CollageEditScreenState extends State<CollageEditScreen> {
   late CollageLayout _selectedLayout;
+  MagazineLayout? _magazineLayout;
+  Project? _project;
+  bool _isMagazineMode = false;
   Color _selectedFrameColor = Colors.white;
-  String _collageText = '';
+  String _collageText = '';  // Legacy: for title mode
   String _selectedFont = 'Roboto';  // Default font
   Color _textColor = Colors.white;
   Color _textBackgroundColor = Colors.black.withValues(alpha: 0.6);
@@ -40,7 +46,13 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   String _titlePosition = 'top';  // 'top' or 'bottom'
   bool _editMode = false;  // Toggle frame editing mode
   bool _hasLoadedArguments = false;
+  bool _hasMagazinePresetApplied = false;  // Track if magazine preset has been applied
   final GlobalKey _repaintKey = GlobalKey();
+  
+  // Multiple text elements support (max 10)
+  final List<TextElement> _textElements = [];
+  TextElement? _selectedTextElement;
+  static const int _maxTextElements = 10;
 
   final List<String> _availableFonts = [
     'Roboto',              // 기본 산세리프
@@ -69,12 +81,17 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   @override
   void initState() {
     super.initState();
-    // Select first layout matching the photo count by default
-    final photoCount = widget.photos.length;
-    final matchingTemplates = FrameTemplates.getTemplatesForPhotoCount(photoCount);
-    _selectedLayout = matchingTemplates.isNotEmpty 
-        ? matchingTemplates.first 
-        : FrameTemplates.getAllTemplates().first;
+    // Select first layout matching the photo count by default (only for regular collage mode)
+    if (widget.photos != null) {
+      final photoCount = widget.photos!.length;
+      final matchingTemplates = FrameTemplates.getTemplatesForPhotoCount(photoCount);
+      _selectedLayout = matchingTemplates.isNotEmpty 
+          ? matchingTemplates.first 
+          : FrameTemplates.getAllTemplates().first;
+    } else {
+      // Magazine mode - layout will be set in didChangeDependencies
+      _selectedLayout = FrameTemplates.getAllTemplates().first;
+    }
   }
 
   @override
@@ -84,12 +101,32 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
     // Load arguments only once
     if (!_hasLoadedArguments) {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      final preselectedLayout = args?['preselectedLayout'] as CollageLayout?;
       
-      if (preselectedLayout != null) {
+      // Check for magazine layout
+      final magazineLayout = args?['magazineLayout'] as MagazineLayout?;
+      final project = args?['project'] as Project?;
+      
+      if (magazineLayout != null && project != null) {
         setState(() {
-          _selectedLayout = preselectedLayout;
+          _magazineLayout = magazineLayout;
+          _project = project;
+          _isMagazineMode = true;
+          // Apply magazine preset: title mode on, default text 'Magazine'
+          if (!_hasMagazinePresetApplied) {
+            _titleMode = true;
+            _collageText = 'Magazine';
+            _hasMagazinePresetApplied = true;
+          }
         });
+      } else {
+        // Regular collage mode
+        final preselectedLayout = args?['preselectedLayout'] as CollageLayout?;
+        
+        if (preselectedLayout != null) {
+          setState(() {
+            _selectedLayout = preselectedLayout;
+          });
+        }
       }
       
       _hasLoadedArguments = true;
@@ -98,27 +135,33 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Convert XFile paths to String paths
-    final imagePaths = widget.photos.map((photo) => photo.path).toList();
+    return Consumer<PhotoProvider>(
+      builder: (context, photoProvider, child) {
+        // Get image paths - from project for magazine mode, from photoProvider for regular mode
+        final imagePaths = _isMagazineMode && _project != null
+            ? _project!.photoPaths
+            : photoProvider.selectedPhotos;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF221019),
-      body: Column(
-        children: [
-          // Top App Bar
-          _buildAppBar(context),
-          
-          // Main Canvas Area - Expand to fill available space
-          Expanded(
-            child: Center(
-              child: _buildCanvasArea(imagePaths),
-            ),
+        return Scaffold(
+          backgroundColor: const Color(0xFF221019),
+          body: Column(
+            children: [
+              // Top App Bar
+              _buildAppBar(context),
+              
+              // Main Canvas Area - Expand to fill available space
+              Expanded(
+                child: Center(
+                  child: _buildCanvasArea(imagePaths),
+                ),
+              ),
+              
+              // Bottom Controls Section - Fixed height
+              _buildControlsSection(),
+            ],
           ),
-          
-          // Bottom Controls Section - Fixed height
-          _buildControlsSection(),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -148,9 +191,9 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
               ),
             ),
             // Title
-            const Text(
-              'Edit Collage',
-              style: TextStyle(
+            Text(
+              _isMagazineMode ? 'Edit Magazine' : 'Edit Collage',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -190,6 +233,202 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 
   Widget _buildCanvasArea(List<String> imagePaths) {
+    // Magazine mode rendering
+    if (_isMagazineMode && _magazineLayout != null && _project != null) {
+      const magazineFrameSpacing = 8.0; // Minimal spacing for magazine style
+      const magazineCornerRadius = 0.0; // Sharp corners for editorial look
+      
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: AspectRatio(
+          aspectRatio: _aspectRatio,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 60,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 20),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  spreadRadius: -5,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Column(
+                children: [
+                  // Top title if enabled
+                  if (_titleMode && _titlePosition == 'top' && _collageText.isNotEmpty)
+                    _buildMagazineTitle(),
+                  // Magazine canvas
+                  Expanded(
+                    child: RepaintBoundary(
+                      key: _repaintKey,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return Stack(
+                            children: [
+                              // Clean white background
+                              Container(color: const Color(0xFFFAFAFA)),
+                              // Magazine frames with padding
+                              Padding(
+                                padding: const EdgeInsets.all(magazineFrameSpacing),
+                                child: Stack(
+                                  children: _magazineLayout!.frames.asMap().entries.map((entry) {
+                                    final index = entry.key;
+                                    final frame = entry.value;
+                                    final photoPath = index < _project!.photoPaths.length 
+                                        ? _project!.photoPaths[index] 
+                                        : null;
+
+                                    // Calculate position with spacing
+                                    final availableWidth = constraints.maxWidth - (magazineFrameSpacing * 2);
+                                    final availableHeight = constraints.maxHeight - (magazineFrameSpacing * 2);
+
+                                    return Positioned(
+                                      left: frame.x * availableWidth,
+                                      top: frame.y * availableHeight,
+                                      width: frame.width * availableWidth,
+                                      height: frame.height * availableHeight,
+                                      child: Transform.rotate(
+                                        angle: frame.rotation * 3.14159 / 180,
+                                        child: Container(
+                                          margin: const EdgeInsets.all(2), // Thin gap between photos
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(magazineCornerRadius),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(alpha: 0.08),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: photoPath != null
+                                              ? ClipRRect(
+                                                  borderRadius: BorderRadius.circular(magazineCornerRadius),
+                                                  child: Image.file(
+                                                    File(photoPath),
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                )
+                                              : Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade100,
+                                                    borderRadius: BorderRadius.circular(magazineCornerRadius),
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              // Text overlays when title mode is OFF
+                              if (!_titleMode) ...[
+                                // Multiple text elements
+                                ..._textElements.map((textElement) {
+                                  return Positioned(
+                                    left: textElement.position.dx.clamp(0.0, constraints.maxWidth - 200),
+                                    top: textElement.position.dy.clamp(0.0, constraints.maxHeight - 100),
+                                    child: GestureDetector(
+                                      onTap: () => _selectTextElement(textElement),
+                                      onPanUpdate: (details) {
+                                        setState(() {
+                                          final index = _textElements.indexWhere((e) => e.id == textElement.id);
+                                          if (index != -1) {
+                                            _textElements[index] = _textElements[index].copyWith(
+                                              position: Offset(
+                                                (textElement.position.dx + details.delta.dx).clamp(0, constraints.maxWidth - 200),
+                                                (textElement.position.dy + details.delta.dy).clamp(0, constraints.maxHeight - 100),
+                                              ),
+                                            );
+                                          }
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: textElement.backgroundColor,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: textElement.isSelected
+                                              ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                                              : null,
+                                        ),
+                                        child: Text(
+                                          textElement.text,
+                                          style: GoogleFonts.getFont(
+                                            textElement.fontFamily,
+                                            fontSize: textElement.size,
+                                            fontWeight: FontWeight.w700,
+                                            color: textElement.textColor,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                                // Legacy single text (if no text elements)
+                                if (_textElements.isEmpty && _collageText.isNotEmpty)
+                                  Positioned(
+                                    left: _textPosition.dx.clamp(0.0, constraints.maxWidth - 200),
+                                    top: _textPosition.dy.clamp(0.0, constraints.maxHeight - 100),
+                                    child: GestureDetector(
+                                      onPanUpdate: (details) {
+                                        setState(() {
+                                          _textPosition = Offset(
+                                            (_textPosition.dx + details.delta.dx).clamp(0, constraints.maxWidth - 200),
+                                            (_textPosition.dy + details.delta.dy).clamp(0, constraints.maxHeight - 100),
+                                          );
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: _textBackgroundColor,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          _collageText,
+                                          style: GoogleFonts.getFont(
+                                            _selectedFont,
+                                            fontSize: _textSize,
+                                            fontWeight: FontWeight.w700,
+                                            color: _textColor,
+                                            height: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  // Bottom title if enabled
+                  if (_titleMode && _titlePosition == 'bottom' && _collageText.isNotEmpty)
+                    _buildMagazineTitle(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Regular collage mode rendering
     return Padding(
       padding: const EdgeInsets.all(16),
       child: AspectRatio(
@@ -211,7 +450,6 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
             ),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
               // Top title if enabled
               if (_titleMode && _titlePosition == 'top' && _collageText.isNotEmpty)
@@ -227,7 +465,8 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                     layout: _selectedLayout,
                     imagePaths: imagePaths,
                     frameColor: _selectedFrameColor,
-                    overlayText: _titleMode ? null : (_collageText.isEmpty ? null : _collageText),
+                    overlayText: _titleMode ? null : (_collageText.isEmpty && _textElements.isEmpty ? null : _collageText),
+                    textElements: _titleMode ? null : (_textElements.isEmpty ? null : _textElements),
                     fontFamily: _selectedFont,
                     textColor: _textColor,
                     textBackgroundColor: _textBackgroundColor,
@@ -247,14 +486,34 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                         // Reset image transform
                       });
                     },
-                    onTextPositionChanged: (newPosition) {
+                    onTextPositionChanged: (textId, newPosition) {
                       setState(() {
-                        _textPosition = newPosition;
+                        if (textId != null) {
+                          final index = _textElements.indexWhere((e) => e.id == textId);
+                          if (index != -1) {
+                            _textElements[index] = _textElements[index].copyWith(position: newPosition);
+                          }
+                        } else {
+                          _textPosition = newPosition;
+                        }
                       });
                     },
-                    onTextSizeChanged: (newSize) {
+                    onTextSizeChanged: (textId, newSize) {
                       setState(() {
-                        _textSize = newSize;
+                        if (textId != null) {
+                          final index = _textElements.indexWhere((e) => e.id == textId);
+                          if (index != -1) {
+                            _textElements[index] = _textElements[index].copyWith(size: newSize);
+                          }
+                        } else {
+                          _textSize = newSize;
+                        }
+                      });
+                    },
+                    onTextTapped: (textId) {
+                      setState(() {
+                        final element = _textElements.firstWhere((e) => e.id == textId);
+                        _selectTextElement(element);
                       });
                     },
                   ),
@@ -459,17 +718,17 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 
   Widget _buildLayoutControls() {
-    final photoCount = widget.photos.length;
-    final availableTemplates = FrameTemplates.getTemplatesForPhotoCount(photoCount);
-    
-    return SingleChildScrollView(
-      child: Padding(
+    // Magazine mode: show magazine layouts only
+    if (_isMagazineMode) {
+      final allMagazineLayouts = MagazineLayouts.getAllLayouts();
+      
+      return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Templates',
+              'Magazine Layouts',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -478,28 +737,114 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            // Grid layout for templates
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
-                alignment: WrapAlignment.start,
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  ...availableTemplates.asMap().entries.map((entry) {
-                    final template = entry.value;
-                    final isSelected = _selectedLayout.id == template.id;
-                    final isNew = entry.key == 0;
-                    
-                    return _buildTemplateOption(template, isSelected, isNew);
-                  }).toList(),
-                  // Shuffle button
-                  _buildShuffleButton(),
-                ],
+            SizedBox(
+              height: 100,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: allMagazineLayouts.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final layout = allMagazineLayouts[index];
+                  final isSelected = _magazineLayout?.id == layout.id;
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _magazineLayout = layout;
+                      });
+                    },
+                    child: Container(
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Theme.of(context).primaryColor.withValues(alpha: 0.3)
+                            : Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Colors.white.withValues(alpha: 0.1),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${layout.frames.length}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? Theme.of(context).primaryColor : Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            layout.name,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white70,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
         ),
+      );
+    }
+    
+    // Regular collage mode
+    final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
+    final photoCount = photoProvider.selectedPhotos.length;
+    final availableTemplates = FrameTemplates.getTemplatesForPhotoCount(photoCount);
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Templates',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Horizontal scroll layout with Shuffle button first
+          SizedBox(
+            height: 80,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                // Shuffle button first
+                _buildShuffleButton(),
+                const SizedBox(width: 12),
+                // Templates
+                ...availableTemplates.asMap().entries.map((entry) {
+                  final template = entry.value;
+                  final isSelected = _selectedLayout.id == template.id;
+                  final isNew = entry.key == 0;
+                  
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: _buildTemplateOption(template, isSelected, isNew),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -571,7 +916,9 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   Widget _buildShuffleButton() {
     return GestureDetector(
       onTap: () {
-        final photoCount = widget.photos.length;
+        if (_isMagazineMode) return;
+        final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
+        final photoCount = photoProvider.selectedPhotos.length;
         final availableTemplates = FrameTemplates.getTemplatesForPhotoCount(photoCount);
         if (availableTemplates.isNotEmpty) {
           setState(() {
@@ -851,41 +1198,12 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Add Text',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Enter text...',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-                filled: true,
-                fillColor: const Color(0xFF2a1520),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _collageText = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            // Title Mode Toggle
+            // Header with Add Text button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Title Mode',
+                  'Text Elements',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
@@ -893,19 +1211,56 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                     letterSpacing: 0.5,
                   ),
                 ),
-                Switch(
-                  value: _titleMode,
-                  onChanged: (value) {
-                    setState(() {
-                      _titleMode = value;
-                    });
-                  },
-                  activeColor: Theme.of(context).primaryColor,
+                Row(
+                  children: [
+                    const Text(
+                      'Title Mode',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: _titleMode,
+                      onChanged: (value) {
+                        setState(() {
+                          _titleMode = value;
+                        });
+                      },
+                      activeColor: Theme.of(context).primaryColor,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ],
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            
+            // Title Mode Text Input (for external title)
             if (_titleMode) ...[
-              const SizedBox(height: 12),
+              TextField(
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Enter title text...',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14),
+                  filled: true,
+                  fillColor: const Color(0xFF2a1520),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _collageText = value;
+                  });
+                },
+              ),
+            if (_titleMode) ...[
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
@@ -916,23 +1271,18 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           color: _titlePosition == 'top'
                               ? Theme.of(context).primaryColor
                               : Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _titlePosition == 'top'
-                                ? Theme.of(context).primaryColor
-                                : Colors.white.withValues(alpha: 0.2),
-                          ),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Center(
                           child: Text(
                             'Top',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
@@ -941,7 +1291,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: GestureDetector(
                       onTap: () {
@@ -950,23 +1300,18 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                         });
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           color: _titlePosition == 'bottom'
                               ? Theme.of(context).primaryColor
                               : Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _titlePosition == 'bottom'
-                                ? Theme.of(context).primaryColor
-                                : Colors.white.withValues(alpha: 0.2),
-                          ),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Center(
                           child: Text(
                             'Bottom',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
@@ -978,159 +1323,391 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                 ],
               ),
             ],
-            const SizedBox(height: 16),
-            const Text(
-              'Font Style',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.5,
+            
+            // Overlay Text Elements (when not in title mode)
+            if (!_titleMode) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Text Elements (${_textElements.length}/$_maxTextElements)',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  if (_textElements.length < _maxTextElements)
+                    GestureDetector(
+                      onTap: _addTextElement,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add, color: Colors.white, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Add',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _availableFonts.length,
-                itemBuilder: (context, index) {
-                  final font = _availableFonts[index];
-                  final isSelected = _selectedFont == font;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedFont = font;
-                        debugPrint('Font changed to: $font');
-                      });
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
+              const SizedBox(height: 8),
+              
+              // Text Elements List
+              if (_textElements.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '텍스트를 추가하려면 + 버튼을 누르세요',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ..._textElements.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final textElement = entry.value;
+                  final isSelected = _selectedTextElement?.id == textElement.id;
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Theme.of(context).primaryColor.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
                         color: isSelected
                             ? Theme.of(context).primaryColor
                             : Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? Theme.of(context).primaryColor
-                              : Colors.white.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _getFontDisplayName(font),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        width: isSelected ? 2 : 1,
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Text Color',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _availableTextColors.map((color) {
-                final isSelected = _textColor == color;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _textColor = color;
-                    });
-                  },
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: isSelected 
-                          ? Border.all(color: Theme.of(context).primaryColor, width: 3)
-                          : Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Background Color',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ..._availableTextColors.map((color) {
-                  final bgColor = color.withValues(alpha: 0.6);
-                  final isSelected = _textBackgroundColor.value == bgColor.value;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _textBackgroundColor = bgColor;
-                      });
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: bgColor,
-                        shape: BoxShape.circle,
-                        border: isSelected 
-                            ? Border.all(color: Theme.of(context).primaryColor, width: 3)
-                            : Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: '텍스트 입력...',
+                                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                                  filled: false,
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                controller: TextEditingController(text: textElement.text)
+                                  ..selection = TextSelection.collapsed(offset: textElement.text.length),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _textElements[index] = textElement.copyWith(text: value);
+                                  });
+                                },
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => _deleteTextElement(textElement.id),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.close,
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => _selectTextElement(textElement),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Theme.of(context).primaryColor
+                                      : Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '편집',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: textElement.textColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   );
                 }).toList(),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _textBackgroundColor = Colors.transparent;
-                    });
-                  },
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                      border: _textBackgroundColor == Colors.transparent
-                          ? Border.all(color: Theme.of(context).primaryColor, width: 3)
-                          : Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                    ),
-                    child: Icon(
-                      Icons.block,
-                      color: Colors.white.withValues(alpha: 0.5),
-                      size: 20,
-                    ),
+              
+              // Selected Text Element Editor
+              if (_selectedTextElement != null) ...[
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white24),
+                const SizedBox(height: 12),
+                const Text(
+                  'Selected Text Style',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 32,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _availableFonts.length,
+                    itemBuilder: (context, index) {
+                      final font = _availableFonts[index];
+                      final isSelected = _selectedTextElement!.fontFamily == font;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _updateSelectedTextElement(fontFamily: font);
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Theme.of(context).primaryColor
+                                : Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).primaryColor
+                                  : Colors.white.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _getFontDisplayName(font),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Text Color',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: _availableTextColors.map((color) {
+                              final isSelected = _selectedTextElement!.textColor == color;
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _updateSelectedTextElement(textColor: color);
+                                  });
+                                },
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: isSelected 
+                                        ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                                        : Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Background',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              ..._availableTextColors.map((color) {
+                                final bgColor = color.withValues(alpha: 0.6);
+                                final isSelected = _selectedTextElement!.backgroundColor == bgColor;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _updateSelectedTextElement(backgroundColor: bgColor);
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: bgColor,
+                                      shape: BoxShape.circle,
+                                      border: isSelected 
+                                          ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                                          : Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _updateSelectedTextElement(backgroundColor: Colors.transparent);
+                                  });
+                                },
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                    border: _selectedTextElement!.backgroundColor == Colors.transparent
+                                        ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                                        : Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                                  ),
+                                  child: Icon(
+                                    Icons.block,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    size: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text(
+                      'Size',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 4,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                          activeTrackColor: Theme.of(context).primaryColor,
+                          inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
+                          thumbColor: Colors.white,
+                        ),
+                        child: Slider(
+                          value: _selectedTextElement!.size,
+                          min: 12,
+                          max: 48,
+                          onChanged: (value) {
+                            setState(() {
+                              _updateSelectedTextElement(size: value);
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${_selectedTextElement!.size.toInt()}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ),
+            ],
           ],
         ),
       ),
@@ -1299,13 +1876,52 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
       debugPrint('[CollageEdit] File exists: $fileExists');
 
       debugPrint('[CollageEdit] Calling StorageService.saveToGallery...');
-      final success = await StorageService.saveToGallery(file);
-      debugPrint('[CollageEdit] Save result: $success');
+      final saveResult = await StorageService.saveToGallery(file);
 
       // Close loading dialog
       if (mounted) Navigator.pop(context);
 
-      if (success) {
+      saveResult.fold(
+        (error) {
+          debugPrint('[CollageEdit] ❌ Save failed: ${error.displayMessage}');
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: const Color(0xFF2a1520),
+                title: Row(
+                  children: [
+                    const Icon(
+                      Icons.error,
+                      color: Colors.red,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Save Failed',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                content: Text(
+                  error.displayMessage,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'OK',
+                      style: TextStyle(color: Theme.of(context).primaryColor),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+        },
+        (success) {
+          if (success) {
         debugPrint('[CollageEdit] ✅ Save successful');
         // Show success message
         if (mounted) {
@@ -1351,10 +1967,46 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
             ),
           );
         }
-      } else {
-        debugPrint('[CollageEdit] ❌ Save failed');
-        throw Exception('Failed to save image to gallery');
-      }
+          } else {
+            debugPrint('[CollageEdit] ❌ Save returned false');
+            if (mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: const Color(0xFF2a1520),
+                  title: const Row(
+                    children: [
+                      Icon(
+                        Icons.error,
+                        color: Colors.red,
+                        size: 28,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Save Failed',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  content: const Text(
+                    '저장에 실패했습니다.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'OK',
+                        style: TextStyle(color: Theme.of(context).primaryColor),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+        },
+      );
     } catch (e, stackTrace) {
       debugPrint('[CollageEdit] ❌ Error during save: $e');
       debugPrint('[CollageEdit] Stack trace: $stackTrace');
@@ -1427,6 +2079,60 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
     );
   }
 
+  Widget _buildMagazineTitle() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+      color: const Color(0xFFFAFAFA),
+      child: Center(
+        child: Text(
+          _collageText,
+          style: _getMagazineTitleTextStyle(),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  TextStyle _getMagazineTitleTextStyle() {
+    final baseStyle = TextStyle(
+      color: Colors.black87,
+      fontSize: _textSize * 1.8,  // Larger for magazine title
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.5,
+    );
+
+    if (_selectedFont.isEmpty || _selectedFont == 'Roboto') {
+      return baseStyle;
+    }
+
+    try {
+      switch (_selectedFont) {
+        case 'Noto Serif KR':
+          return GoogleFonts.notoSerifKr(textStyle: baseStyle);
+        case 'Black Han Sans':
+          return GoogleFonts.blackHanSans(textStyle: baseStyle);
+        case 'Nanum Pen Script':
+          return GoogleFonts.nanumPenScript(textStyle: baseStyle);
+        case 'Do Hyeon':
+          return GoogleFonts.doHyeon(textStyle: baseStyle);
+        case 'Pacifico':
+          return GoogleFonts.pacifico(textStyle: baseStyle);
+        case 'Bebas Neue':
+          return GoogleFonts.bebasNeue(textStyle: baseStyle);
+        case 'Dancing Script':
+          return GoogleFonts.dancingScript(textStyle: baseStyle);
+        case 'Monoton':
+          return GoogleFonts.monoton(textStyle: baseStyle);
+        case 'Righteous':
+          return GoogleFonts.righteous(textStyle: baseStyle);
+        default:
+          return baseStyle;
+      }
+    } catch (e) {
+      return baseStyle;
+    }
+  }
+
   TextStyle _getTitleTextStyle() {
     final baseStyle = TextStyle(
       color: _textColor,
@@ -1493,6 +2199,72 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
     }
   }
 
+  // Text Element Management Methods
+  void _addTextElement() {
+    if (_textElements.length >= _maxTextElements) return;
+    
+    setState(() {
+      final newText = TextElement(
+        text: '텍스트',
+        position: Offset(100 + (_textElements.length * 20), 100 + (_textElements.length * 30)),
+        size: _textSize,
+        fontFamily: _selectedFont,
+        textColor: _textColor,
+        backgroundColor: _textBackgroundColor,
+      );
+      _textElements.add(newText);
+      _selectedTextElement = newText;
+    });
+  }
+
+  void _deleteTextElement(String id) {
+    setState(() {
+      _textElements.removeWhere((element) => element.id == id);
+      if (_selectedTextElement?.id == id) {
+        _selectedTextElement = _textElements.isNotEmpty ? _textElements.first : null;
+      }
+    });
+  }
+
+  void _selectTextElement(TextElement element) {
+    setState(() {
+      _selectedTextElement = element;
+      // Update global text properties to match selected element
+      _selectedFont = element.fontFamily;
+      _textColor = element.textColor;
+      _textBackgroundColor = element.backgroundColor;
+      _textSize = element.size;
+    });
+  }
+
+  void _updateSelectedTextElement({
+    String? fontFamily,
+    Color? textColor,
+    Color? backgroundColor,
+    double? size,
+  }) {
+    if (_selectedTextElement == null) return;
+    
+    setState(() {
+      final index = _textElements.indexWhere((e) => e.id == _selectedTextElement!.id);
+      if (index != -1) {
+        _textElements[index] = _textElements[index].copyWith(
+          fontFamily: fontFamily,
+          textColor: textColor,
+          backgroundColor: backgroundColor,
+          size: size,
+        );
+        _selectedTextElement = _textElements[index];
+        
+        // Update global properties
+        if (fontFamily != null) _selectedFont = fontFamily;
+        if (textColor != null) _textColor = textColor;
+        if (backgroundColor != null) _textBackgroundColor = backgroundColor;
+        if (size != null) _textSize = size;
+      }
+    });
+  }
+
   void _showPhotoOptions(BuildContext context, int index) {
     showModalBottomSheet(
       context: context,
@@ -1551,6 +2323,9 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
   }
 
   void _showSwapDialog(int sourceIndex) {
+    final photoProvider = Provider.of<PhotoProvider>(context, listen: false);
+    final photos = photoProvider.selectedPhotos;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1566,7 +2341,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
               ),
-              itemCount: widget.photos.length,
+              itemCount: photos.length,
               itemBuilder: (context, targetIndex) {
                 if (targetIndex == sourceIndex) return const SizedBox.shrink();
                 
@@ -1578,7 +2353,7 @@ class _CollageEditScreenState extends State<CollageEditScreen> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.file(
-                      File(widget.photos[targetIndex].path),
+                      File(photos[targetIndex]),
                       fit: BoxFit.cover,
                     ),
                   ),

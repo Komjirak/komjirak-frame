@@ -1,7 +1,7 @@
 name: komjirak_frame
-description: "📸 Flutter로 만든 사진 콜라주 프레임 서비스 - 1~10장의 사진으로 아름다운 콜라주를 만들어보세요"
+description: "📸 Flutter로 만든 사진 콜라주 프레임 서비스 - 1~12장의 사진으로 아름다운 콜라주를 만들어보세요"
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -37,11 +37,19 @@ dependencies:
   uuid: ^4.3.3
   intl: ^0.19.0
   google_fonts: ^6.1.0
+  
+  # Caching
+  flutter_cache_manager: ^3.3.1
+  
+  # Connectivity
+  connectivity_plus: ^5.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  mockito: ^5.4.4
+  build_runner: ^2.4.7
 
 flutter:
   uses-material-design: true

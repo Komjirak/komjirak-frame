@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/collage_layout.dart';
+import '../models/text_element.dart';
 
 class CollageCanvas extends StatefulWidget {
   final CollageLayout layout;
@@ -11,7 +12,8 @@ class CollageCanvas extends StatefulWidget {
   final Function(int)? onImageTapped;
   final Function(int)? onImageDoubleTapped;
   final Color frameColor;
-  final String? overlayText;
+  final String? overlayText;  // Legacy: single text support
+  final List<TextElement>? textElements;  // New: multiple text elements
   final String? fontFamily;
   final Color? textColor;
   final Color? textBackgroundColor;
@@ -20,8 +22,9 @@ class CollageCanvas extends StatefulWidget {
   final double frameSpacing;
   final double aspectRatio;
   final Offset? textPosition;
-  final Function(Offset)? onTextPositionChanged;
-  final Function(double)? onTextSizeChanged;
+  final Function(String?, Offset)? onTextPositionChanged;  // Updated: textId, position
+  final Function(String?, double)? onTextSizeChanged;  // Updated: textId, size
+  final Function(String)? onTextTapped;  // New: text element tapped
   final double cornerRadius;
   final bool editMode;  // New: Enable frame editing
   final Function(List<FrameCell>)? onLayoutChanged;  // New: Callback when layout changes
@@ -35,6 +38,7 @@ class CollageCanvas extends StatefulWidget {
     this.onImageDoubleTapped,
     this.frameColor = Colors.white,
     this.overlayText,
+    this.textElements,
     this.fontFamily,
     this.textColor,
     this.textBackgroundColor,
@@ -45,6 +49,7 @@ class CollageCanvas extends StatefulWidget {
     this.textPosition,
     this.onTextPositionChanged,
     this.onTextSizeChanged,
+    this.onTextTapped,
     this.cornerRadius = 0.0,
     this.editMode = false,
     this.onLayoutChanged,
@@ -93,9 +98,12 @@ class _CollageCanvasState extends State<CollageCanvas> {
               // Draggable dividers - only show when hovering or dragging
               if (widget.editMode)
                 ..._buildDividers(constraints),
-              // Text overlay if provided
-              if (widget.overlayText != null && widget.overlayText!.isNotEmpty)
-                _buildTextOverlay(constraints),
+              // Text overlays - support multiple text elements
+              if (widget.textElements != null && widget.textElements!.isNotEmpty)
+                ...widget.textElements!.map((textElement) => _buildTextOverlay(constraints, textElement))
+              // Legacy: single text overlay support
+              else if (widget.overlayText != null && widget.overlayText!.isNotEmpty)
+                _buildTextOverlay(constraints, null, widget.overlayText),
             ],
           );
         },
@@ -144,6 +152,10 @@ class _CollageCanvasState extends State<CollageCanvas> {
       child: GestureDetector(
         onTap: () {
           // Call onImageTapped callback if provided
+          widget.onImageTapped?.call(index);
+        },
+        onLongPress: () {
+          // Call onImageTapped callback for long press (to show options menu)
           widget.onImageTapped?.call(index);
         },
         onDoubleTap: () {
@@ -256,9 +268,18 @@ class _CollageCanvasState extends State<CollageCanvas> {
     );
   }
 
-  Widget _buildTextOverlay(BoxConstraints constraints) {
-    final position = widget.textPosition ?? Offset(constraints.maxWidth / 2, constraints.maxHeight - 60);
-    final textSize = widget.textSize ?? 18.0;
+  Widget _buildTextOverlay(BoxConstraints constraints, [TextElement? textElement, String? legacyText]) {
+    // Use TextElement if provided, otherwise use legacy single text
+    final text = textElement?.text ?? legacyText ?? '';
+    final position = textElement?.position ?? widget.textPosition ?? Offset(constraints.maxWidth / 2, constraints.maxHeight - 60);
+    final textSize = textElement?.size ?? widget.textSize ?? 18.0;
+    final fontFamily = textElement?.fontFamily ?? widget.fontFamily;
+    final textColor = textElement?.textColor ?? widget.textColor ?? Colors.white;
+    final backgroundColor = textElement?.backgroundColor ?? widget.textBackgroundColor ?? Colors.black.withValues(alpha: 0.6);
+    final textId = textElement?.id;
+    final isSelected = textElement?.isSelected ?? false;
+    
+    if (text.isEmpty) return const SizedBox.shrink();
     
     return Positioned(
       left: 0,
@@ -268,41 +289,67 @@ class _CollageCanvasState extends State<CollageCanvas> {
       child: Stack(
         children: [
           Positioned(
-            left: position.dx - 100,
-            top: position.dy - 30,
+            left: position.dx.clamp(0.0, constraints.maxWidth - 200),
+            top: position.dy.clamp(0.0, constraints.maxHeight - 100),
             child: GestureDetector(
-              // Use onScaleUpdate for both move and resize
+              onTap: () {
+                if (textId != null && widget.onTextTapped != null) {
+                  widget.onTextTapped!(textId);
+                }
+              },
               onScaleStart: (details) {
                 // Store initial state
               },
               onScaleUpdate: (details) {
-                // If scale changed, resize text
-                if (details.scale != 1.0 && widget.onTextSizeChanged != null) {
-                  final newSize = (textSize * details.scale).clamp(12.0, 48.0);
-                  widget.onTextSizeChanged!(newSize);
-                }
-                // If position changed (panning), move text
-                if (details.focalPointDelta.dx != 0 || details.focalPointDelta.dy != 0) {
-                  if (widget.onTextPositionChanged != null) {
-                    widget.onTextPositionChanged!(
-                      Offset(
-                        position.dx + details.focalPointDelta.dx,
-                        position.dy + details.focalPointDelta.dy,
-                      ),
-                    );
+                if (textId == null) {
+                  // Legacy single text handling
+                  if (details.scale != 1.0 && widget.onTextSizeChanged != null) {
+                    final newSize = (textSize * details.scale).clamp(12.0, 48.0);
+                    widget.onTextSizeChanged!(null, newSize);
+                  }
+                  if (details.focalPointDelta.dx != 0 || details.focalPointDelta.dy != 0) {
+                    if (widget.onTextPositionChanged != null) {
+                      widget.onTextPositionChanged!(
+                        null,
+                        Offset(
+                          (position.dx + details.focalPointDelta.dx).clamp(0, constraints.maxWidth - 200),
+                          (position.dy + details.focalPointDelta.dy).clamp(0, constraints.maxHeight - 100),
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  // Multiple text elements handling
+                  if (details.scale != 1.0 && widget.onTextSizeChanged != null) {
+                    final newSize = (textSize * details.scale).clamp(12.0, 48.0);
+                    widget.onTextSizeChanged!(textId, newSize);
+                  }
+                  if (details.focalPointDelta.dx != 0 || details.focalPointDelta.dy != 0) {
+                    if (widget.onTextPositionChanged != null) {
+                      widget.onTextPositionChanged!(
+                        textId,
+                        Offset(
+                          (position.dx + details.focalPointDelta.dx).clamp(0, constraints.maxWidth - 200),
+                          (position.dy + details.focalPointDelta.dy).clamp(0, constraints.maxHeight - 100),
+                        ),
+                      );
+                    }
                   }
                 }
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: widget.textBackgroundColor ?? Colors.black.withValues(alpha: 0.6),
+                  color: backgroundColor,
                   borderRadius: BorderRadius.circular(8),
+                  border: isSelected
+                      ? Border.all(color: Theme.of(context).primaryColor, width: 2)
+                      : null,
                 ),
                 child: Text(
-                  widget.overlayText!,
+                  text,
                   textAlign: TextAlign.center,
-                  style: _getTextStyle(widget.fontFamily, textSize),
+                  style: _getTextStyle(fontFamily, textSize, textColor),
                 ),
               ),
             ),
@@ -312,9 +359,10 @@ class _CollageCanvasState extends State<CollageCanvas> {
     );
   }
 
-  TextStyle _getTextStyle(String? fontFamily, double fontSize) {
+  TextStyle _getTextStyle(String? fontFamily, double fontSize, [Color? textColor]) {
+    final color = textColor ?? widget.textColor ?? Colors.white;
     final baseStyle = TextStyle(
-      color: widget.textColor ?? Colors.white,
+      color: color,
       fontSize: fontSize,
       fontWeight: FontWeight.bold,
       shadows: [

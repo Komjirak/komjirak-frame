@@ -498,61 +498,88 @@ class _ExportScreenState extends State<ExportScreen> {
       print('[SaveToGallery] Temp file created: ${tempFile.path}');
 
       // Request permissions
-      print('[SaveToGallery] Requesting storage permissions...');
-      final hasPermission = await StorageService.requestPermissions();
-      print('[SaveToGallery] Permission granted: $hasPermission');
+      debugPrint('[SaveToGallery] Requesting storage permissions...');
+      final permissionResult = await StorageService.requestPermissions();
       
-      if (!hasPermission) {
-        throw Exception('Storage permission denied. Please grant permission in Settings.');
+      if (permissionResult.isFailure) {
+        final error = permissionResult.errorOrNull;
+        throw Exception(error?.displayMessage ?? 'Storage permission denied. Please grant permission in Settings.');
       }
 
       // Apply quality settings if needed
-      File? processedImage = tempFile;
+      File processedImage = tempFile;
       int quality = _selectedQuality == ExportQuality.high
           ? 100
           : _selectedQuality == ExportQuality.medium
               ? 85
               : 70;
 
-      print('[SaveToGallery] Selected quality: $quality');
+      debugPrint('[SaveToGallery] Selected quality: $quality');
 
       if (quality < 100) {
-        print('[SaveToGallery] Compressing image...');
-        processedImage = await ImageService.compressImage(tempFile, quality: quality);
-        processedImage ??= tempFile;
-        print('[SaveToGallery] Compression complete');
+        debugPrint('[SaveToGallery] Compressing image...');
+        final compressResult = await ImageService.compressImage(tempFile, quality: quality);
+        compressResult.fold(
+          (error) {
+            debugPrint('[SaveToGallery] Compression failed: ${error.message}');
+            // 압축 실패해도 원본 파일 사용
+          },
+          (compressed) {
+            processedImage = compressed;
+            debugPrint('[SaveToGallery] Compression complete');
+          },
+        );
       }
 
       // Save to gallery
-      print('[SaveToGallery] Saving to gallery...');
-      final success = await StorageService.saveToGallery(processedImage);
-      print('[SaveToGallery] Save result: $success');
+      debugPrint('[SaveToGallery] Saving to gallery...');
+      final saveResult = await StorageService.saveToGallery(processedImage);
 
       if (!mounted) return;
 
-      if (success) {
-        setState(() {
-          _isSaving = false;
-          _isSaved = true;
-        });
-
-        final message = Platform.isMacOS
-            ? 'Collage saved to Downloads folder successfully!'
-            : 'Collage saved to gallery successfully!';
-        _showSuccessSnackBar(message);
-        print('[SaveToGallery] ✅ Save completed successfully!');
-
-        // Reset the saved state after 3 seconds
-        Future.delayed(const Duration(seconds: 3), () {
+      saveResult.fold(
+        (error) {
+          debugPrint('[SaveToGallery] Save failed: ${error.displayMessage}');
           if (mounted) {
             setState(() {
-              _isSaved = false;
+              _isSaving = false;
             });
+            _showErrorSnackBar('저장 실패: ${error.displayMessage}');
           }
-        });
-      } else {
-        throw Exception('SaveToGallery returned false - check StorageService logs');
-      }
+        },
+        (success) {
+          if (success) {
+            if (mounted) {
+              setState(() {
+                _isSaving = false;
+                _isSaved = true;
+              });
+
+              final message = Platform.isMacOS
+                  ? 'Collage saved to Downloads folder successfully!'
+                  : 'Collage saved to gallery successfully!';
+              _showSuccessSnackBar(message);
+              debugPrint('[SaveToGallery] ✅ Save completed successfully!');
+
+              // Reset the saved state after 3 seconds
+              Future.delayed(const Duration(seconds: 3), () {
+                if (mounted) {
+                  setState(() {
+                    _isSaved = false;
+                  });
+                }
+              });
+            }
+          } else {
+            if (mounted) {
+              setState(() {
+                _isSaving = false;
+              });
+              _showErrorSnackBar('저장에 실패했습니다.');
+            }
+          }
+        },
+      );
     } catch (e, stackTrace) {
       print('[SaveToGallery] ❌ Error: $e');
       print('[SaveToGallery] Stack trace: $stackTrace');
